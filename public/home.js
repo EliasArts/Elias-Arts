@@ -12,7 +12,7 @@ loadHome();
 const sf=document.getElementById('subscribeForm');
 if(sf)sf.addEventListener('submit',async e=>{
  e.preventDefault();const b=sf.querySelector('button');b.disabled=true;
- try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('subscribeEmail').value})});const d=await r.json();if(!r.ok)throw Error(d.error||'Could not subscribe');sf.innerHTML='<div class="subscribed">Subscribed</div>';sf.classList.add('subscribed-state')}
+ try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('subscribeEmail').value})});const d=await r.json();if(!r.ok)throw Error(d.error||'Could not subscribe');sf.innerHTML='<div class="subscribed">'+(d.already_subscribed?'Already subscribed':'Subscribed')+'</div>';sf.classList.add('subscribed-state')}
  catch(err){b.disabled=false;b.textContent=err.message}
 });
 const donate=document.getElementById('donateBtn');
