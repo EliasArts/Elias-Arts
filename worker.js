@@ -119,19 +119,19 @@ export default {async fetch(request,env){
     return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
    }
    let m;
-   if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\\d+)?$/))){
+   if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\d+)?$/))){
     const id=m[1];
     if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug)return bad("Name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").first();await env.DB.prepare("INSERT INTO categories(slug,name,description,banner_key,sort_order,is_visible) VALUES(?,?,?,?,?,1)").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),max.n).run();return ok({success:true});}
     if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE categories SET slug=?,name=?,description=?,banner_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),id).run();return ok({success:true});}
     if(request.method==="DELETE"&&id){await env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id).run();return ok({success:true});}
    }
-   if((m=url.pathname.match(/^\/api\/admin\/topics\/?(\\d+)?$/))){
+   if((m=url.pathname.match(/^\/api\/admin\/topics\/?(\d+)?$/))){
     const id=m[1];
     if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug||!b.category_id)return bad("Category, name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM topics WHERE category_id=?").bind(b.category_id).first();await env.DB.prepare("INSERT INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(b.category_id,slugify(b.slug),String(b.name).trim(),max.n).run();return ok({success:true});}
     if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE topics SET category_id=?,slug=?,name=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(b.category_id,slugify(b.slug),String(b.name).trim(),id).run();return ok({success:true});}
     if(request.method==="DELETE"&&id){await env.DB.prepare("DELETE FROM topics WHERE id=?").bind(id).run();return ok({success:true});}
    }
-   if((m=url.pathname.match(/^\/api\/admin\/printables\/?(\\d+)?$/))){
+   if((m=url.pathname.match(/^\/api\/admin\/printables\/?(\d+)?$/))){
     const id=m[1];
     if(request.method==="POST"&&!id){
      const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");
@@ -145,7 +145,7 @@ export default {async fetch(request,env){
      await env.DB.prepare("DELETE FROM printables WHERE id=?").bind(id).run();return ok({success:true});
     }
    }
-   if((m=url.pathname.match(/^\/api\/admin\/printables\/(\\d+)\/files$/))&&request.method==="POST"){
+   if((m=url.pathname.match(/^\/api\/admin\/printables\/(\d+)\/files$/))&&request.method==="POST"){
     const id=m[1];const exists=await env.DB.prepare("SELECT id FROM printables WHERE id=?").bind(id).first();if(!exists)return bad("Printable not found.",404);
     const form=await request.formData();const file=form.get("file");const type=String(form.get("file_type")||"");
     if(!(file instanceof File)||!["cover","preview","page","pdf"].includes(type))return bad("File and valid file type are required.");
@@ -159,7 +159,7 @@ export default {async fetch(request,env){
     if(type==="cover")await env.DB.prepare("UPDATE printables SET cover_file_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(r.meta.last_row_id,id).run();
     return ok({success:true,id:r.meta.last_row_id,url:fileUrl(key)});
    }
-   if((m=url.pathname.match(/^\/api\/admin\/printables\/files\/(\\d+)$/))&&request.method==="DELETE"){
+   if((m=url.pathname.match(/^\/api\/admin\/printables\/files\/(\d+)$/))&&request.method==="DELETE"){
     const f=await env.DB.prepare("SELECT storage_key FROM printable_files WHERE id=?").bind(m[1]).first();if(f)await env.FILES.delete(f.storage_key);await env.DB.prepare("DELETE FROM printable_files WHERE id=?").bind(m[1]).run();return ok({success:true});
    }
    return bad("Not found.",404);
