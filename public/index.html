@@ -24,9 +24,11 @@ footer{padding:34px 0 22px;border-top:1px solid var(--border);background:var(--s
 @media(max-width:950px){.hero-grid{grid-template-columns:1fr}.visual{min-height:390px}.cards{grid-template-columns:repeat(3,1fr)}.subscribe-box{grid-template-columns:1fr}.foot-main{grid-template-columns:1fr;justify-items:center;text-align:center}.foot-brand .small{margin-left:auto;margin-right:auto}.socials{justify-content:center}}
 @media(max-width:620px){.container{width:min(100% - 28px,1380px)}header{height:62px}.logo{font-size:25px}.nav-actions{gap:14px}.hero{padding-top:40px}h1{font-size:51px}.visual{min-height:330px}.sheet{width:190px;padding:15px}.sheet.one{left:0}.sheet.two{left:27%}.sheet.three{right:0}.inside{padding:12px}.inside .title{font-size:18px}.bunny{font-size:65px}.search-box{padding-left:14px}.search-submit{padding:10px 16px}.cards{grid-template-columns:1fr 1fr}.email{flex-direction:column}.email input{width:100%}.donation-box{padding:30px 24px}.foot-nav{flex-wrap:wrap;gap:12px 18px}.foot-bottom{flex-direction:column;text-align:center}}
 </style>
-</head>
+<style>
+.cat-menu-wrap{position:relative}.cat-menu-btn{border:0;background:none;color:var(--ink);font:13px Manrope;cursor:pointer;padding:8px 0}.cat-menu-btn span{margin-left:4px;font-size:12px}.cat-menu{display:none;position:absolute;right:0;top:38px;width:min(720px,calc(100vw - 28px));background:var(--paper);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 45px rgba(41,39,36,.12);padding:22px;z-index:50}.cat-menu.open{display:block}.cat-menu-title{font-family:"DM Serif Display";font-size:24px;margin-bottom:16px}.cat-menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.cat-menu-col{min-width:0}.cat-menu-col>a{display:block;font-weight:700;font-size:13px;margin-bottom:8px}.cat-menu-col a.topic-link{font-weight:400;color:var(--muted);font-size:12px;margin:5px 0}.cat-menu-col a.topic-link:hover,.cat-menu-col>a:hover{color:var(--sage-dark)}@media(max-width:700px){.cat-menu{right:-10px}.cat-menu-grid{grid-template-columns:1fr 1fr}}@media(max-width:480px){.cat-menu-grid{grid-template-columns:1fr}}
+</style></head>
 <body>
-<header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a class="search-link" href="/search"><span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Search</span></a><a href="#categories">Categories</a></nav></div></header>
+<header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a class="search-link" href="/search"><span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Search</span></a><div class="cat-menu-wrap"><button class="cat-menu-btn" id="catMenuBtn" type="button">Categories <span>⌄</span></button><div class="cat-menu" id="catMenu"><div class="cat-menu-title">Browse all categories</div><div id="catMenuGrid" class="cat-menu-grid"></div></div></div></nav></div></header>
 
 <main>
 <section class="hero"><div class="container hero-grid"><div><div class="eyebrow">Printables for a brighter everyday</div><h1>Beautiful printables for everyday creativity.</h1><p>Discover thoughtfully designed printables for creating, planning, learning and enjoying.</p><div class="buttons"><a class="btn primary" href="#latest">Explore Printables →</a></div></div>
@@ -44,5 +46,18 @@ footer{padding:34px 0 22px;border-top:1px solid var(--border);background:var(--s
 </main>
 
 <footer><div class="container"><div class="foot-main"><div class="foot-brand"><div class="logo">EliasArts</div><div class="small">Free printables for a more creative everyday.</div></div><nav class="foot-nav"><a href="/">Home</a><a href="#categories">Categories</a><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a></nav><div class="socials"><a href="https://www.pinterest.com/" target="_blank" rel="noopener" aria-label="Pinterest">P</a><a href="https://www.instagram.com/" target="_blank" rel="noopener" aria-label="Instagram">◎</a></div></div><div class="foot-bottom"><div class="small">© 2026 EliasArts. All rights reserved.</div><div class="small">Made for creativity, one printable at a time.</div></div></div></footer>
-<script src="/home.js"></script></body>
+<script src="/home.js"></script><script>
+async function loadCategoryMenu(){
+ try{
+  const [cats,topics]=await Promise.all([fetch('/api/categories').then(r=>r.json()),fetch('/api/topics').then(r=>r.json())]);
+  const by={};topics.forEach(t=>(by[t.category_id]??=[]).push(t));
+  const grid=document.getElementById('catMenuGrid');
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/search?q='+encodeURIComponent(c.name)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('');
+ }catch(e){console.error(e)}
+}
+const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');
+cmb?.addEventListener('click',e=>{e.stopPropagation();cm.classList.toggle('open')});
+document.addEventListener('click',()=>cm?.classList.remove('open'));
+loadCategoryMenu();
+</script></body>
 </html>
