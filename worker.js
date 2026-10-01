@@ -192,6 +192,7 @@ export default {async fetch(request,env){
    return new Response(obj.body,{headers});
   }
   if(url.pathname.startsWith("/printable/")) return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
+  if(["/about","/contact","/privacy","/terms"].includes(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/info.html",url),request));
   return env.ASSETS.fetch(request);
  }catch(e){return bad("Server error: "+e.message,500)}
 }};
