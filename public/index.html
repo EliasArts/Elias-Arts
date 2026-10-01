@@ -52,7 +52,7 @@ async function loadCategoryMenu(){
   const [cats,topics]=await Promise.all([fetch('/api/categories').then(r=>r.json()),fetch('/api/topics').then(r=>r.json())]);
   const by={};topics.forEach(t=>(by[t.category_id]??=[]).push(t));
   const grid=document.getElementById('catMenuGrid');
-  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/search?q='+encodeURIComponent(c.name)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('');
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category/'+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('');
  }catch(e){console.error(e)}
 }
 const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');
