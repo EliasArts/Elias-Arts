@@ -195,7 +195,7 @@ export default {async fetch(request,env){
    await env.DB.prepare("INSERT OR IGNORE INTO subscribers(email) VALUES(?)").bind(email).run();return ok({success:true});
   }
   if(url.pathname.startsWith("/api/categories/")){
-   const slug=decodeURIComponent(url.pathname.slice("/api/categories/".length)).replace(/\\/$/,"");
+   const slug=decodeURIComponent(url.pathname.slice("/api/categories/".length)).replace(/\/$/,"");
    const c=await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE slug=? AND is_visible=1").bind(slug).first();
    if(!c)return bad("Category not found.",404);
    const topics=(await env.DB.prepare("SELECT id,slug,name,description,sort_order FROM topics WHERE category_id=? AND is_visible=1 ORDER BY sort_order,id").bind(c.id).all()).results;
