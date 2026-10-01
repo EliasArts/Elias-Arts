@@ -192,7 +192,14 @@ export default {async fetch(request,env){
   if(url.pathname==="/api/subscribe"&&request.method==="POST"){
    const b=await jsonBody(request);const email=String(b.email||"").trim().toLowerCase();
    if(!/^\S+@\S+\.\S+$/.test(email))return bad("Please enter a valid email.");
-   await env.DB.prepare("INSERT OR IGNORE INTO subscribers(email) VALUES(?)").bind(email).run();return ok({success:true});
+   const existing=await env.DB.prepare("SELECT id,status FROM subscribers WHERE email=?").bind(email).first();
+   if(existing){
+    if(existing.status==="active")return ok({success:true,already_subscribed:true,message:"This email is already subscribed to Elias Arts."});
+    await env.DB.prepare("UPDATE subscribers SET status='active' WHERE id=?").bind(existing.id).run();
+    return ok({success:true,reactivated:true,message:"Your subscription has been reactivated."});
+   }
+   await env.DB.prepare("INSERT INTO subscribers(email) VALUES(?)").bind(email).run();
+   return ok({success:true,subscribed:true,message:"You're subscribed to Elias Arts."});
   }
   if(url.pathname.startsWith("/api/categories/")){
    const slug=decodeURIComponent(url.pathname.slice("/api/categories/".length)).replace(/\/$/,"");
