@@ -191,6 +191,7 @@ export default {async fetch(request,env){
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
    return new Response(obj.body,{headers});
   }
+  if(url.pathname.startsWith("/printable/")) return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
   return env.ASSETS.fetch(request);
  }catch(e){return bad("Server error: "+e.message,500)}
 }};
