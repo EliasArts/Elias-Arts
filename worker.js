@@ -130,13 +130,13 @@ export default {
       const r=await env.DB.prepare("SELECT t.*,c.name category_name FROM topics t JOIN categories c ON c.id=t.category_id ORDER BY c.sort_order,t.sort_order,t.id").all();return ok(r.results);
     }
     let m;
-    if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\\d+)?$/))){
+    if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\d+)?$/))){
       const id=m[1];
       if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug)return bad("Name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").first();await env.DB.prepare("INSERT INTO categories(slug,name,description,banner_key,sort_order,is_visible) VALUES(?,?,?,?,?,1)").bind(b.slug.trim(),b.name.trim(),b.description||"",b.banner_key||"",max.n).run();return ok({success:true})}
       if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE categories SET slug=?,name=?,description=?,banner_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(b.slug.trim(),b.name.trim(),b.description||"",b.banner_key||"",id).run();return ok({success:true})}
       if(request.method==="DELETE"&&id){await env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id).run();return ok({success:true})}
     }
-    if((m=url.pathname.match(/^\/api\/admin\/topics\/?(\\d+)?$/))){
+    if((m=url.pathname.match(/^\/api\/admin\/topics\/?(\d+)?$/))){
       const id=m[1];
       if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug||!b.category_id)return bad("Category, name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM topics WHERE category_id=?").bind(b.category_id).first();await env.DB.prepare("INSERT INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(b.category_id,b.slug.trim(),b.name.trim(),max.n).run();return ok({success:true})}
       if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE topics SET category_id=?,slug=?,name=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(b.category_id,b.slug.trim(),b.name.trim(),id).run();return ok({success:true})}
