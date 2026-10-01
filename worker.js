@@ -56,7 +56,7 @@ const TOPICS={
 "gifts-occasions":[["cards","Cards"],["gift-tags","Gift Tags"],["invitations","Invitations"],["seasonal","Seasonal"]]};
 
 async function ensureDatabase(db){
- await db.exec(SCHEMA);
+ for(const statement of SCHEMA.split(";").map(s=>s.trim()).filter(Boolean)) await db.prepare(statement).run();
  for(const [slug,name,description,sort] of SEED)
   await db.prepare("INSERT OR IGNORE INTO categories(slug,name,description,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(slug,name,description,sort).run();
  for(const [catSlug,items] of Object.entries(TOPICS)){
@@ -65,7 +65,7 @@ async function ensureDatabase(db){
    await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
  }}
 let initialized=false,initPromise;
-async function init(db){if(initialized)return;if(!initPromise)initPromise=ensureDatabase(db).then(()=>{initialized=true});await initPromise}
+async function init(db){if(initialized)return;if(!initPromise)initPromise=ensureDatabase(db).then(()=>{initialized=true}).catch(e=>{initPromise=null;throw e});await initPromise}
 
 function b64u(bytes){let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replaceAll("+","-").replaceAll("/","_").replaceAll("=","")}
 function fromB64u(s){s=s.replaceAll("-","+").replaceAll("_","/");while(s.length%4)s+="=";return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
