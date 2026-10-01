@@ -7,5 +7,12 @@
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "elias-arts-db",
+      "database_id": "1cbd5c3c-84aa-4897-b220-a6d0a3a24462"
+    }
+  ]
 }
