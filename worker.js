@@ -93,8 +93,16 @@ async function publicPrintable(db,slug){
 
 export default {async fetch(request,env){
  try{
-  await init(env.DB);
   const url=new URL(request.url);
+  if(request.method==="GET"){
+   if(url.pathname==="/printable"||url.pathname==="/printable/") return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
+   if(url.pathname.startsWith("/printable/")) return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
+   if(url.pathname==="/category"||url.pathname==="/category/") return env.ASSETS.fetch(new Request(new URL("/category.html",url),request));
+   if(url.pathname.startsWith("/category/")) return env.ASSETS.fetch(new Request(new URL("/category.html",url),request));
+   if(["/about","/contact","/privacy","/terms"].includes(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/info.html",url),request));
+   if(url.pathname==="/admin"||url.pathname==="/admin/") return env.ASSETS.fetch(new Request(new URL("/admin.html",url),request));
+  }
+  await init(env.DB);
   if(url.pathname==="/api/admin/login"&&request.method==="POST"){
    if(!env.ADMIN_PASSWORD)return bad("Admin password is not configured in Cloudflare yet.",503);
    const b=await jsonBody(request);if(!b.password||b.password!==env.ADMIN_PASSWORD)return bad("Incorrect password.",401);
@@ -167,19 +175,35 @@ export default {async fetch(request,env){
    return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
   }
   if(url.pathname==="/api/search"){
-   const q=(url.searchParams.get("q")||"").trim();if(!q)return ok([]);
-   const like="%"+q.replaceAll("%","\\%").replaceAll("_","\\_")+"%";
-   const r=await env.DB.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
+   const q=(url.searchParams.get("q")||"").trim();
+   if(!q)return ok((await env.DB.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
     (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
     FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
-    WHERE p.is_published=1 AND (p.title LIKE ? ESCAPE '\\' OR p.description LIKE ? ESCAPE '\\' OR c.name LIKE ? ESCAPE '\\' OR t.name LIKE ? ESCAPE '\\')
-    ORDER BY p.created_at DESC LIMIT 60`).bind(like,like,like,like).all();
+    WHERE p.is_published=1 ORDER BY p.created_at DESC LIMIT 60`).all()).results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
+   const like="%"+q.replaceAll("%","\\%").replaceAll("_","\\_")+"%";
+   const r=await env.DB.prepare(`SELECT DISTINCT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
+    (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
+    FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
+    LEFT JOIN printable_files sf ON sf.printable_id=p.id
+    WHERE p.is_published=1 AND (p.title LIKE ? ESCAPE '\\' OR p.description LIKE ? ESCAPE '\\' OR c.name LIKE ? ESCAPE '\\' OR t.name LIKE ? ESCAPE '\\' OR sf.original_name LIKE ? ESCAPE '\\')
+    ORDER BY p.created_at DESC LIMIT 60`).bind(like,like,like,like,like).all();
    return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
   }
   if(url.pathname==="/api/subscribe"&&request.method==="POST"){
    const b=await jsonBody(request);const email=String(b.email||"").trim().toLowerCase();
    if(!/^\S+@\S+\.\S+$/.test(email))return bad("Please enter a valid email.");
    await env.DB.prepare("INSERT OR IGNORE INTO subscribers(email) VALUES(?)").bind(email).run();return ok({success:true});
+  }
+  if(url.pathname.startsWith("/api/categories/")){
+   const slug=decodeURIComponent(url.pathname.slice("/api/categories/".length)).replace(/\\/$/,"");
+   const c=await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE slug=? AND is_visible=1").bind(slug).first();
+   if(!c)return bad("Category not found.",404);
+   const topics=(await env.DB.prepare("SELECT id,slug,name,description,sort_order FROM topics WHERE category_id=? AND is_visible=1 ORDER BY sort_order,id").bind(c.id).all()).results;
+   const r=await env.DB.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
+    (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
+    FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
+    WHERE p.is_published=1 AND p.category_id=? ORDER BY p.created_at DESC LIMIT 60`).bind(c.id).all();
+   return ok({...c,banner_url:c.banner_key?fileUrl(c.banner_key):null,topics,printables:r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null}))});
   }
   if(url.pathname.startsWith("/api/printables/")){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p):bad("Printable not found.",404);
@@ -191,8 +215,6 @@ export default {async fetch(request,env){
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
    return new Response(obj.body,{headers});
   }
-  if(url.pathname.startsWith("/printable/")) return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
-  if(["/about","/contact","/privacy","/terms"].includes(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/info.html",url),request));
   return env.ASSETS.fetch(request);
  }catch(e){return bad("Server error: "+e.message,500)}
 }};
