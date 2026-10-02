@@ -15,11 +15,6 @@
       "bucket_name": "elias-arts-files"
     }
   ],
-  "analytics": { "binding": "ANALYTICS_SQL" },
-  "analytics_engine_datasets": [
-    { "binding": "DOWNLOADS", "dataset": "elias_arts_downloads" },
-    { "binding": "TRAFFIC", "dataset": "elias_arts_traffic" }
-  ],
   "d1_databases": [
     {
       "binding": "DB",
