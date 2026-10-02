@@ -17,7 +17,7 @@ header{height:72px;border-bottom:1px solid var(--border);display:flex;align-item
 @media(max-width:900px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:620px){.container{width:calc(100% - 28px)}header{height:62px}.logo{font-size:25px}.nav-actions{gap:14px}.cards{grid-template-columns:1fr 1fr}.foot{flex-direction:column}.cat-menu-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:450px){.cat-menu-grid{grid-template-columns:1fr}}
 </style>
-</head>
+<style>.cat-menu-loading{font-size:12px;color:var(--muted);padding:8px 0}</style></head>
 <body>
 <header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a href="/search">Search</a><div class="cat-menu-wrap"><button class="cat-menu-btn" id="catMenuBtn" type="button" aria-expanded="false">Categories <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button><div class="cat-menu" id="catMenu"><div class="cat-menu-title">Browse categories</div><div id="catMenuGrid" class="cat-menu-grid"></div></div></div><a href="/info.html?page=about">About</a></nav></div></header>
 <main class="container">
@@ -35,8 +35,31 @@ async function run(value){const term=value.trim();q.value=term;btn.disabled=true
 $('searchForm').addEventListener('submit',e=>{e.preventDefault();run(q.value)});document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>run(b.dataset.q)));
 q.value=new URLSearchParams(location.search).get('q')||'';run(q.value);
 
-async function loadCategoryMenu(){try{const[a,b]=await Promise.all([fetch('/api/categories'),fetch('/api/topics')]);if(!a.ok||!b.ok)throw Error();const cats=await a.json(),topics=await b.json(),by={};topics.forEach(t=>(by[t.category_id]??=[]).push(t));$('catMenuGrid').innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('')}catch(e){console.error(e)}}
-const cmb=$('catMenuBtn'),cm=$('catMenu');cmb.addEventListener('click',e=>{e.stopPropagation();const open=cm.classList.toggle('open');cmb.setAttribute('aria-expanded',open?'true':'false')});document.addEventListener('click',()=>{cm.classList.remove('open');cmb.setAttribute('aria-expanded','false')});loadCategoryMenu();
+
+let catMenuLoaded=false;
+async function loadCategoryMenu(){
+ if(catMenuLoaded)return;
+ catMenuLoaded=true;
+ const grid=document.getElementById('catMenuGrid');
+ if(grid)grid.innerHTML='<div class="cat-menu-loading">Loading categories…</div>';
+ try{
+  const r=await fetch('/api/navigation');
+  if(!r.ok)throw Error();
+  const cats=await r.json();
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+c.topics.map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join('')+'</div>').join('');
+ }catch(e){
+  catMenuLoaded=false;
+  if(grid)grid.innerHTML='<div class="cat-menu-loading">Categories could not be loaded. Please try again.</div>';
+ }
+}
+const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');
+cmb?.addEventListener('click',e=>{
+ e.stopPropagation();
+ const open=cm.classList.toggle('open');
+ cmb.setAttribute('aria-expanded',open?'true':'false');
+ if(open)loadCategoryMenu();
+});
+document.addEventListener('click',()=>{cm?.classList.remove('open');cmb?.setAttribute('aria-expanded','false')});
 </script>
 </body>
 </html>
