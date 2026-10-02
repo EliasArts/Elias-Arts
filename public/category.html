@@ -18,17 +18,17 @@ footer{border-top:1px solid var(--border);background:var(--sand);padding:28px 0;
 </style>
 </head>
 <body>
-<header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a href="/">Home</a><a href="/search">Search</a><a href="/#categories">Categories</a></nav></div></header>
+<header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a href="/">Home</a><a href="/search">Search</a><a href="/category.html">Categories</a></nav></div></header>
 <main class="container page" id="page">
 <div class="crumb"><a href="/">Home</a> / <span id="crumb">Category</span></div>
 <div id="content"></div>
 </main>
-<footer><div class="container foot"><span>EliasArts · Free printables for a more creative everyday.</span><span><a href="/">Home</a> · <a href="/search">Search</a> · <a href="/about">About</a> · <a href="/contact">Contact</a></span></div></footer>
+<footer><div class="container foot"><span>EliasArts · Free printables for a more creative everyday.</span><span><a href="/">Home</a> · <a href="/search">Search</a> · <a href="/info.html?page=about">About</a> · <a href="/info.html?page=contact">Contact</a></span></div></footer>
 <script>
 const root=document.getElementById('content');
 const pathName=location.pathname; const slug=(pathName==='/category'||pathName==='/category/')?'':decodeURIComponent(pathName.slice('/category/'.length).replace(/\/$/,''));
 const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-function card(p){return '<a class="card" href="/printable/'+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img src="'+p.cover_url+'" alt="'+esc(p.title)+'">':'<span class="placeholder">Preview</span>')+'</div><div class="title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||'Printable')+' · Free</div>'+(p.description?'<div class="desc">'+esc(p.description)+'</div>':'')+'</a>'}
+function card(p){return '<a class="card" href="/printable.html?slug='+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img src="'+p.cover_url+'" alt="'+esc(p.title)+'">':'<span class="placeholder">Preview</span>')+'</div><div class="title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||'Printable')+' · Free</div>'+(p.description?'<div class="desc">'+esc(p.description)+'</div>':'')+'</a>'}
 async function load(){
  try{
   if(!slug){

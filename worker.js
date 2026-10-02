@@ -94,14 +94,6 @@ async function publicPrintable(db,slug){
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
-  if(request.method==="GET"){
-   if(url.pathname==="/printable"||url.pathname==="/printable/") return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
-   if(url.pathname.startsWith("/printable/")) return env.ASSETS.fetch(new Request(new URL("/printable.html",url),request));
-   if(url.pathname==="/category"||url.pathname==="/category/") return env.ASSETS.fetch(new Request(new URL("/category.html",url),request));
-   if(url.pathname.startsWith("/category/")) return env.ASSETS.fetch(new Request(new URL("/category.html",url),request));
-   if(["/about","/contact","/privacy","/terms"].includes(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/info.html",url),request));
-   if(url.pathname==="/admin"||url.pathname==="/admin/") return env.ASSETS.fetch(new Request(new URL("/admin.html",url),request));
-  }
   await init(env.DB);
   if(url.pathname==="/api/admin/login"&&request.method==="POST"){
    if(!env.ADMIN_PASSWORD)return bad("Admin password is not configured in Cloudflare yet.",503);

@@ -7,17 +7,7 @@
     "directory": "./public",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page",
-    "run_worker_first": [
-      "/api/*",
-      "/files/*",
-      "/admin",
-      "/admin/*",
-      "/category",
-      "/category/*",
-      "/printable",
-      "/printable/*"
-    ]
+    "not_found_handling": "404-page"
   },
   "r2_buckets": [
     {
