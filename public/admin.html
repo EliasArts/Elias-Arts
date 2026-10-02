@@ -34,22 +34,6 @@ main{padding:36px 0 70px}.login{max-width:430px;margin:65px auto;background:var(
 </section></main>
 <div id="modal" class="modal"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="modal-actions"><button id="cancelBtn" class="btn secondary">Cancel</button><button id="saveBtn" class="btn">Save</button></div></div></div>
 <script>
-let token=sessionStorage.getItem('ea_admin_token')||'',categories=[],topics=[],printables=[],libraryStats=null,subscriberTotal=0;const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-async function api(path,opts={}){
- opts.headers={...(opts.headers||{}),'Authorization':'Bearer '+token};
- if(opts.body&&typeof opts.body==='object'&&!(opts.body instanceof FormData)){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(opts.body)}
- const r=await fetch(path,opts);const t=await r.text();let d=null;try{d=JSON.parse(t)}catch{}
- if(r.status===401){logout();throw Error('Your admin session has expired. Please log in again.')}
- if(!r.ok)throw Error(d?.error||'Request failed.');
- return d;
-}
-function status(msg,isError=false){$('globalStatus').textContent=msg||'';$('globalStatus').style.color=isError?'#9b5140':'var(--muted)'}
-function showDash(){$('login').style.display='none';$('dashboard').style.display='block';$('logout').style.display='inline-block';load()}
-function logout(){sessionStorage.removeItem('ea_admin_token');token='';$('dashboard').style.display='none';$('logout').style.display='none';$('login').style.display='block';$('password').value=''}
-$('logout').onclick=logout;$('password').onkeydown=e=>{if(e.key==='Enter')$('loginBtn').click()};
-$('loginBtn').onclick=async()=>{const b=$('loginBtn');b.disabled=true;b.textContent='Logging in…';$('loginError').textContent='';try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('password').value})});const t=await r.text();let d={};try{d=JSON.parse(t)}catch{}if(!r.ok)throw Error(d.error||'Login failed.');token=d.token;sessionStorage.setItem('ea_admin_token',token);showDash()}catch(e){$('loginError').textContent=e.message}finally{b.disabled=false;b.textContent='Log in'}};
-async function load(){status('Loading library…');try{const [c,t,p,st,sub]=await Promise.all([api('/api/admin/categories'),api('/api/admin/topics'),api('/api/admin/printables'),api('/api/admin/stats'),api('/api/admin/subscribers?limit=1')]);categories=c;topics=t;printables=p;libraryStats=st;subscriberTotal=sub.total||0;render();status('')}catch(e){status(e.message,true)}}
 let token=sessionStorage.getItem('ea_admin_token')||'',categories=[],topics=[],printables=[],subscriberTotal=0;const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
 async function api(path,opts={}){
