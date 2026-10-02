@@ -122,6 +122,15 @@ function slugify(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]
 function safeKey(s){return String(s||"").replace(/[^a-zA-Z0-9._\/-]/g,"-").replace(/^\/+|\/+$/g,"")}
 function fileUrl(key){return "/files/"+key.split("/").map(encodeURIComponent).join("/")}
 
+async function servePreloadedPage(env,request,path,data){
+ const assetUrl=new URL(request.url);assetUrl.pathname=path;assetUrl.search="";
+ const asset=await env.ASSETS.fetch(new Request(assetUrl.toString(),request));
+ if(!asset.ok)return asset;
+ const html=await asset.text();
+ const safe=JSON.stringify(data).replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026");
+ const injected="<script>window.__ELIAS_PRELOADED__="+safe+";<\\/script>";
+ return new Response(html.replace("</head>",injected+"</head>"),{status:asset.status,headers:new Headers(asset.headers)});
+}
 async function publicPrintable(db,slug){
  const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug
  FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
@@ -150,6 +159,24 @@ export default {async fetch(request,env){
   if(routeMatch=url.pathname.match(/^\/printable\/([^/]+)$/)) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
   if(routeMatch=url.pathname.match(/^\/category\/([^/]+)$/)) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
 
+  if((url.pathname==="/printable.html"||url.pathname==="/category.html")&&request.method==="GET"){
+   const slug=String(url.searchParams.get("slug")||"");
+   if(slug){
+    await init(env.DB);
+    if(url.pathname==="/printable.html"){
+     const p=await publicPrintable(env.DB,slug);if(p)return servePreloadedPage(env,request,"/printable.html",p);return bad("Printable not found.",404);
+    }
+    const cat=await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE slug=? AND is_visible=1").bind(slug).first();
+    if(cat){
+     const topics=(await env.DB.prepare("SELECT id,slug,name,description,sort_order FROM topics WHERE category_id=? AND is_visible=1 ORDER BY sort_order,id").bind(cat.id).all()).results;
+     const sql=["SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,","(SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key","FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id","WHERE p.is_published=1 AND p.category_id=? ORDER BY p.created_at DESC LIMIT 60"].join(" ");
+     const r=await env.DB.prepare(sql).bind(cat.id).all();
+     const data={...cat,banner_url:cat.banner_key?fileUrl(cat.banner_key):null,topics,printables:r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null}))};
+     return servePreloadedPage(env,request,"/category.html",data);
+    }
+    return bad("Category not found.",404);
+   }
+  }
   if(url.pathname.startsWith("/files/")&&request.method==="GET"){
    const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
    if(!key||key.includes(".."))return bad("Invalid file.",400);
