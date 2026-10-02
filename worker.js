@@ -146,6 +146,10 @@ export default {async fetch(request,env){
     try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:["pageview"],blobs:[url.pathname],doubles:[1]});}catch{}
   }
 
+  let routeMatch;
+  if(routeMatch=url.pathname.match(/^\/printable\/([^/]+)$/)) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
+  if(routeMatch=url.pathname.match(/^\/category\/([^/]+)$/)) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
+
   if(url.pathname.startsWith("/files/")&&request.method==="GET"){
    const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
    if(!key||key.includes(".."))return bad("Invalid file.",400);
@@ -153,7 +157,7 @@ export default {async fetch(request,env){
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
    return new Response(obj.body,{headers});
   }
-  if(url.pathname.startsWith("/api/")||url.pathname==="/sitemap.xml") await init(env.DB);
+  if(url.pathname.startsWith("/api/admin/")||url.pathname==="/api/subscribe"||url.pathname==="/sitemap.xml") await init(env.DB);
   if(url.pathname==="/api/admin/login"&&request.method==="POST"){
    if(!env.ADMIN_PASSWORD)return bad("Admin password is not configured in Cloudflare yet.",503);
    const b=await jsonBody(request);if(!b.password||b.password!==env.ADMIN_PASSWORD)return bad("Incorrect password.",401);
@@ -353,7 +357,7 @@ export default {async fetch(request,env){
   }
   if(url.pathname==="/sitemap.xml"&&request.method==="GET"){
     const base="https://elias-arts.eliasoscararts.workers.dev";
-    const urls=[base+"/",base+"/search",base+"/category.html?slug=coloring-creative",base+"/category.html?slug=planning-organization",base+"/category.html?slug=letter-journaling",base+"/category.html?slug=decorative",base+"/category.html?slug=gifts-occasions",base+"/info.html?page=about",base+"/info.html?page=contact",base+"/info.html?page=privacy",base+"/info.html?page=terms"];
+    const urls=[base+"/",base+"/category.html?slug=coloring-creative",base+"/category.html?slug=planning-organization",base+"/category.html?slug=letter-journaling",base+"/category.html?slug=decorative",base+"/category.html?slug=gifts-occasions",base+"/info.html?page=about",base+"/info.html?page=contact",base+"/info.html?page=privacy",base+"/info.html?page=terms"];
     const cats=(await env.DB.prepare("SELECT slug FROM categories WHERE is_visible=1 ORDER BY sort_order").all()).results;
     const prints=(await env.DB.prepare("SELECT slug FROM printables WHERE is_published=1 ORDER BY created_at DESC").all()).results;
     const all=[...urls,...cats.map(c=>base+"/category.html?slug="+encodeURIComponent(c.slug)),...prints.map(p=>base+"/printable.html?slug="+encodeURIComponent(p.slug))];
