@@ -15,6 +15,10 @@
       "bucket_name": "elias-arts-files"
     }
   ],
+  "analytics": { "binding": "ANALYTICS_SQL" },
+  "analytics_engine_datasets": [
+    { "binding": "DOWNLOADS", "dataset": "elias_arts_downloads" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
