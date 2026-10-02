@@ -150,6 +150,18 @@ export default {async fetch(request,env){
     const rows=(await env.DB.prepare("SELECT id,email,status,created_at FROM subscribers WHERE status='active' ORDER BY created_at DESC,id DESC LIMIT ?").bind(limit).all()).results;
     return ok({total:count.total||0,subscribers:rows});
    }
+   if(url.pathname==="/api/admin/analytics"&&request.method==="GET"){
+    const empty={traffic30d:0,downloads30d:0,downloadsToday:0,daily:[],byPrintable:[]};
+    if(!env.ANALYTICS_SQL)return ok(empty);
+    try{
+      const r1=await env.ANALYTICS_SQL.query({query:"SELECT COUNT(*) AS requests FROM events.httpRequests WHERE timestamp >= NOW() - INTERVAL '30' DAY"});
+      const r2=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
+      const r3=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'1\' DAY'});
+      const r4=await env.ANALYTICS_SQL.query({query:'SELECT blob1 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
+      const r5=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
+      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[]});
+    }catch{return ok(empty)}
+   }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
     const [totals,cats,topics]=await Promise.all([
       env.DB.prepare("SELECT COUNT(*) total, SUM(CASE WHEN is_published=1 THEN 1 ELSE 0 END) published FROM printables").first(),
@@ -290,6 +302,7 @@ export default {async fetch(request,env){
    const p=await publicPrintable(env.DB,slug);if(!p)return bad("Printable not found.",404);
    const pdf=p.files.find(f=>f.file_type==="pdf");if(!pdf)return bad("PDF not available.",404);
    const obj=await env.FILES.get(pdf.storage_key);if(!obj)return bad("PDF file not found.",404);
+   try{env.DOWNLOADS?.writeDataPoint({indexes:[slug],blobs:[slug,p.title],doubles:[1]});}catch{}
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("Content-Type","application/pdf");headers.set("Content-Disposition",`attachment; filename="${String(pdf.original_name||p.title+".pdf").replace(/["\\]/g,"-")}"`);
    return new Response(obj.body,{headers});
   }
