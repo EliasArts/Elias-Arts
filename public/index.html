@@ -45,14 +45,14 @@ footer{padding:34px 0 22px;border-top:1px solid var(--border);background:var(--s
 <section class="donation" id="donate"><div class="container"><div class="donation-box"><div><div class="eyebrow">Support Elias Arts</div><h2>Enjoying the free printables?</h2><p>If Elias Arts helps make your days a little more creative, you can support the project and help keep the library growing.</p></div><button class="btn donate-btn" id="donateBtn">Support the Project →</button></div></div></section>
 </main>
 
-<footer><div class="container"><div class="foot-main"><div class="foot-brand"><div class="logo">EliasArts</div><div class="small">Free printables for a more creative everyday.</div></div><nav class="foot-nav"><a href="/">Home</a><a href="#categories">Categories</a><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a></nav><div class="socials"><a href="https://www.pinterest.com/" target="_blank" rel="noopener" aria-label="Pinterest">P</a><a href="https://www.instagram.com/" target="_blank" rel="noopener" aria-label="Instagram">◎</a></div></div><div class="foot-bottom"><div class="small">© 2026 EliasArts. All rights reserved.</div><div class="small">Made for creativity, one printable at a time.</div></div></div></footer>
+<footer><div class="container"><div class="foot-main"><div class="foot-brand"><div class="logo">EliasArts</div><div class="small">Free printables for a more creative everyday.</div></div><nav class="foot-nav"><a href="/">Home</a><a href="#categories">Categories</a><a href="/info.html?page=about">About</a><a href="/info.html?page=contact">Contact</a><a href="/info.html?page=privacy">Privacy Policy</a><a href="/info.html?page=terms">Terms</a></nav><div class="socials"><a href="https://www.pinterest.com/" target="_blank" rel="noopener" aria-label="Pinterest">P</a><a href="https://www.instagram.com/" target="_blank" rel="noopener" aria-label="Instagram">◎</a></div></div><div class="foot-bottom"><div class="small">© 2026 EliasArts. All rights reserved.</div><div class="small">Made for creativity, one printable at a time.</div></div></div></footer>
 <script src="/home.js"></script><script>
 async function loadCategoryMenu(){
  try{
   const [cats,topics]=await Promise.all([fetch('/api/categories').then(r=>r.json()),fetch('/api/topics').then(r=>r.json())]);
   const by={};topics.forEach(t=>(by[t.category_id]??=[]).push(t));
   const grid=document.getElementById('catMenuGrid');
-  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category/'+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('');
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('');
  }catch(e){console.error(e)}
 }
 const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');
