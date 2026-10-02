@@ -46,7 +46,7 @@ async function loadCategoryMenu(){
   const r=await fetch('/api/navigation');
   if(!r.ok)throw Error();
   const cats=await r.json();
-  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+c.topics.map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join('')+'</div>').join('');
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+c.topics.map(t=>'<a class="topic-link" href="/category.html?slug='+encodeURIComponent(c.slug)+'&topic='+encodeURIComponent(t.slug)+'">'+esc(t.name)+'</a>').join('')+'</div>').join('');
  }catch(e){
   catMenuLoaded=false;
   if(grid)grid.innerHTML='<div class="cat-menu-loading">Categories could not be loaded. Please try again.</div>';
