@@ -107,10 +107,8 @@ function safeKey(s){return String(s||"").replace(/[^a-zA-Z0-9._\/-]/g,"-").repla
 function fileUrl(key){return "/files/"+key.split("/").map(encodeURIComponent).join("/")}
 
 async function publicPrintable(db,slug){
- const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug,
- d.paper_size,d.format_info,d.page_count
+ const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug
  FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
-
  WHERE p.slug=? AND p.is_published=1`).bind(slug).first();
  if(!p)return null;
  const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(p.id).all();
@@ -180,7 +178,6 @@ export default {async fetch(request,env){
    }
    if(url.pathname==="/api/admin/printables"&&request.method==="GET"){
     const r=await env.DB.prepare(`SELECT p.*,c.name category_name,t.name topic_name,
-      p.paper_size,p.format_info,p.page_count,
       (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
       FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id ORDER BY p.created_at DESC`).all();
     return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
