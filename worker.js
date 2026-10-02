@@ -170,14 +170,16 @@ export default {async fetch(request,env){
     return ok({total:count.total||0,subscribers:rows});
    }
    if(url.pathname==="/api/admin/analytics"&&request.method==="GET"){
-    const empty={daily:[],byPrintable:[]};
+    if(!(await validToken(request,env.ADMIN_PASSWORD)))return bad("Unauthorized.",401);
+    const empty={daily:[],byPrintable:[],topPages:[]};
     if(!env.ANALYTICS_SQL)return ok(empty);
     try{
-      const daily=await env.ANALYTICS_SQL.query({query:
-        'SELECT toStartOfDay(timestamp) AS day, blob1 AS event, SUM(_sample_interval * double1) AS count FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day,event ORDER BY day LIMIT 500'});
-      const byPrintable=await env.ANALYTICS_SQL.query({query:
-        'SELECT blob2 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY AND blob1=\'download\' GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
-      return ok({daily:daily.data||[],byPrintable:byPrintable.data||[]});
+      const [daily,byPrintable,topPages]=await Promise.all([
+        env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, blob1 AS event, SUM(_sample_interval * double1) AS count FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY GROUP BY day,event ORDER BY day LIMIT 1000'}),
+        env.ANALYTICS_SQL.query({query:'SELECT blob2 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY AND blob1=\'download\' GROUP BY printable ORDER BY downloads DESC LIMIT 100'}),
+        env.ANALYTICS_SQL.query({query:'SELECT blob2 AS path, SUM(_sample_interval * double1) AS pageviews FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY AND blob1=\'pageview\' GROUP BY path ORDER BY pageviews DESC LIMIT 20'})
+      ]);
+      return ok({daily:daily.data||[],byPrintable:byPrintable.data||[],topPages:topPages.data||[]});
     }catch(e){console.error("Analytics query error",e);return ok(empty)}
    }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
