@@ -63,15 +63,30 @@ const TOPICS={
 "gifts-occasions":[["cards","Cards"],["gift-tags","Gift Tags"],["invitations","Invitations"],["seasonal","Seasonal"]]};
 
 async function ensureDatabase(db){
- for(const statement of SCHEMA.split(";").map(s=>s.trim()).filter(Boolean)) await db.prepare(statement).run();
- for(const [slug,name,description,sort] of SEED)
-  await db.prepare("INSERT OR IGNORE INTO categories(slug,name,description,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(slug,name,description,sort).run();
- for(const [catSlug,items] of Object.entries(TOPICS)){
-  const cat=await db.prepare("SELECT id FROM categories WHERE slug=?").bind(catSlug).first(); if(!cat) continue;
-  for(let i=0;i<items.length;i++)
-   await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
+ const settingsTable=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='site_settings' LIMIT 1").first();
+ if(!settingsTable){
+  for(const statement of SCHEMA.split(";").map(s=>s.trim()).filter(Boolean)) await db.prepare(statement).run();
  }
- await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
+ const detailsTable=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='printable_details' LIMIT 1").first();
+ if(!detailsTable){
+  await db.prepare("CREATE TABLE IF NOT EXISTS printable_details (printable_id INTEGER PRIMARY KEY,paper_size TEXT NOT NULL DEFAULT 'A4',format_info TEXT NOT NULL DEFAULT 'PDF',page_count INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE)").run();
+  await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
+ }
+ const seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
+ if(!seeded){
+  const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
+  if(!hasCategory){
+   for(const [slug,name,description,sort] of SEED)
+    await db.prepare("INSERT INTO categories(slug,name,description,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(slug,name,description,sort).run();
+   for(const [catSlug,items] of Object.entries(TOPICS)){
+    const cat=await db.prepare("SELECT id FROM categories WHERE slug=?").bind(catSlug).first();
+    if(!cat) continue;
+    for(let i=0;i<items.length;i++)
+     await db.prepare("INSERT INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
+   }
+  }
+  await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','1')").run();
+ }
 }
 let initialized=false,initPromise;
 async function init(db){if(initialized)return;if(!initPromise)initPromise=ensureDatabase(db).then(()=>{initialized=true}).catch(e=>{initPromise=null;throw e});await initPromise}
@@ -154,7 +169,7 @@ export default {async fetch(request,env){
    if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\d+)?$/))){
     const id=m[1];
     if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug)return bad("Name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").first();const r=await env.DB.prepare("INSERT INTO categories(slug,name,description,banner_key,sort_order,is_visible) VALUES(?,?,?,?,?,1)").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),max.n).run();return ok({success:true,id:r.meta.last_row_id});}
-    if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE categories SET slug=?,name=?,description=?,banner_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),id).run();return ok({success:true});}
+    if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE categories SET slug=?,name=?,description=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug),String(b.name).trim(),b.description||"",id).run();return ok({success:true});}
     if(request.method==="DELETE"&&id){const c=await env.DB.prepare("SELECT banner_key FROM categories WHERE id=?").bind(id).first();if(c?.banner_key)await env.FILES.delete(c.banner_key);await env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id).run();return ok({success:true});}
    }
    if((m=url.pathname.match(/^\/api\/admin\/categories\/(\d+)\/banner$/))&&request.method==="POST"){
