@@ -110,7 +110,7 @@ async function publicPrintable(db,slug){
  const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug,
  d.paper_size,d.format_info,d.page_count
  FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
- LEFT JOIN printable_details d ON d.printable_id=p.id
+
  WHERE p.slug=? AND p.is_published=1`).bind(slug).first();
  if(!p)return null;
  const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(p.id).all();
@@ -160,7 +160,7 @@ export default {async fetch(request,env){
    }
    if(url.pathname==="/api/admin/printables"&&request.method==="GET"){
     const r=await env.DB.prepare(`SELECT p.*,c.name category_name,t.name topic_name,
-      d.paper_size,d.format_info,d.page_count,
+      p.paper_size,p.format_info,p.page_count,
       (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
       FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id ORDER BY p.created_at DESC`).all();
     return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
@@ -193,9 +193,9 @@ export default {async fetch(request,env){
     if(request.method==="POST"&&!id){
      const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");
      const slug=slugify(b.slug||title);if(!slug)return bad("A valid slug is required.");
-     try{const r=await env.DB.prepare("INSERT INTO printables(slug,title,description,category_id,topic_id,is_featured,is_published,sort_order) VALUES(?,?,?,?,?,?,?,0)").bind(slug,title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0).run();const id=r.meta.last_row_id;await env.DB.prepare("INSERT OR IGNORE INTO printable_details(printable_id,paper_size,format_info,page_count) VALUES(?,?,?,?)").bind(id,b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1)).run();return ok({success:true,id,slug});}catch(e){return bad("Could not create printable. The slug may already exist.",409);}
+     try{const r=await env.DB.prepare("INSERT INTO printables(slug,title,description,category_id,topic_id,is_featured,is_published,sort_order) VALUES(?,?,?,?,?,?,?,0)").bind(slug,title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0).run();const id=r.meta.last_row_id;await env.DB.prepare("UPDATE printables SET paper_size=?,format_info=?,page_count=? WHERE id=?").bind(b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1),id).run();return ok({success:true,id,slug});}catch(e){return bad("Could not create printable. The slug may already exist.",409);}
     }
-    if(request.method==="PUT"&&id){const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");await env.DB.prepare("UPDATE printables SET slug=?,title=?,description=?,category_id=?,topic_id=?,is_featured=?,is_published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug||title),title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0,id).run();await env.DB.prepare("INSERT OR REPLACE INTO printable_details(printable_id,paper_size,format_info,page_count) VALUES(?,?,?,?)").bind(id,b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1)).run();return ok({success:true});}
+    if(request.method==="PUT"&&id){const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");await env.DB.prepare("UPDATE printables SET slug=?,title=?,description=?,category_id=?,topic_id=?,is_featured=?,is_published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug||title),title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0,id).run();await env.DB.prepare("UPDATE printables SET paper_size=?,format_info=?,page_count=? WHERE id=?").bind(b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1),id).run();return ok({success:true});}
     if(request.method==="DELETE"&&id){
      const fs=await env.DB.prepare("SELECT storage_key FROM printable_files WHERE printable_id=?").bind(id).all();
      for(const f of fs.results)await env.FILES.delete(f.storage_key);
