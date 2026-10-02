@@ -127,6 +127,11 @@ async function publicPrintable(db,slug){
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
+  const pagePaths=new Set(["/","/search","/category.html","/printable.html","/info.html"]);
+  if(request.method==="GET"&&pagePaths.has(url.pathname)){
+   try{env.TRAFFIC?.writeDataPoint({indexes:[url.hostname],blobs:[url.pathname],doubles:[1]});}catch{}
+  }
+
   if(url.pathname.startsWith("/files/")&&request.method==="GET"){
    const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
    if(!key||key.includes(".."))return bad("Invalid file.",400);
@@ -154,12 +159,14 @@ export default {async fetch(request,env){
     const empty={traffic30d:0,downloads30d:0,downloadsToday:0,daily:[],byPrintable:[]};
     if(!env.ANALYTICS_SQL)return ok(empty);
     try{
-      const r1=await env.ANALYTICS_SQL.query({query:"SELECT COUNT(*) AS requests FROM events.httpRequests WHERE timestamp >= NOW() - INTERVAL '30' DAY"});
+      const r1=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
       const r2=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
       const r3=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'1\' DAY'});
       const r4=await env.ANALYTICS_SQL.query({query:'SELECT blob1 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
       const r5=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
-      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[]});
+      const r6=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
+
+      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[],trafficDaily:r6.data||[]});
     }catch{return ok(empty)}
    }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
