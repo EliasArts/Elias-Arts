@@ -116,7 +116,7 @@ async function validToken(request,secret){
  const p=h.slice(7).split(".");if(p.length!==2)return false;if(await sign(p[0],secret)!==p[1])return false;
  try{return JSON.parse(new TextDecoder().decode(fromB64u(p[0]))).exp>Date.now()}catch{return false}}
 async function jsonBody(request){try{return await request.json()}catch{return {}}}
-function ok(data,status=200){return Response.json(data,{status})}
+function ok(data,status=200,headers={}){return Response.json(data,{status,headers})}
 function bad(message,status=400){return Response.json({error:message},{status})}
 function slugify(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,90)}
 function safeKey(s){return String(s||"").replace(/[^a-zA-Z0-9._\/-]/g,"-").replace(/^\/+|\/+$/g,"")}
@@ -143,7 +143,7 @@ export default {async fetch(request,env){
   const url=new URL(request.url);
   const trackedPages=new Set(["/","/search","/category.html","/printable.html","/info.html"]);
   if(request.method==="GET"&&trackedPages.has(url.pathname)){
-    try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:["pageview"],blobs:[url.pathname],doubles:[1]});}catch{}
+    try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:["pageview"],blobs:["pageview",url.pathname],doubles:[1]});}catch{}
   }
 
   let routeMatch;
@@ -276,16 +276,16 @@ export default {async fetch(request,env){
     if(!map.has(r.category_id))map.set(r.category_id,{id:r.category_id,slug:r.category_slug,name:r.category_name,topics:[]});
     if(r.topic_id)map.get(r.category_id).topics.push({id:r.topic_id,slug:r.topic_slug,name:r.topic_name});
    }
-   return ok([...map.values()]);
+   return ok([...map.values()],200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   }
-  if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results);
-  if(url.pathname==="/api/topics")return ok((await env.DB.prepare("SELECT t.id,t.slug,t.name,t.description,t.category_id,c.slug category_slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.is_visible=1 AND c.is_visible=1 ORDER BY c.sort_order,t.sort_order,t.id").all()).results);
+  if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
+  if(url.pathname==="/api/topics")return ok((await env.DB.prepare("SELECT t.id,t.slug,t.name,t.description,t.category_id,c.slug category_slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.is_visible=1 AND c.is_visible=1 ORDER BY c.sort_order,t.sort_order,t.id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   if(url.pathname==="/api/printables"){
    const r=await env.DB.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug,
     (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
     FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
     WHERE p.is_published=1 ORDER BY p.created_at DESC LIMIT 60`).all();
-   return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
+   return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})),200,{"Cache-Control":"public, max-age=30, stale-while-revalidate=120"});
   }
   if(url.pathname==="/api/search"){
    const q=(url.searchParams.get("q")||"").trim();
@@ -323,7 +323,7 @@ export default {async fetch(request,env){
     (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
     FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
     WHERE p.is_published=1 AND p.category_id=? ORDER BY p.created_at DESC LIMIT 60`).bind(c.id).all();
-   return ok({...c,banner_url:c.banner_key?fileUrl(c.banner_key):null,topics,printables:r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null}))});
+   return ok({...c,banner_url:c.banner_key?fileUrl(c.banner_key):null,topics,printables:r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null}))},200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   }
   if(url.pathname.startsWith("/api/printables/")&&url.pathname.endsWith("/download")){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length,-"/download".length)).replace(/\/$/,"");
@@ -340,7 +340,7 @@ export default {async fetch(request,env){
    return new Response(obj.body,{headers});
   }
   if(url.pathname.startsWith("/api/printables/")){
-   const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p):bad("Printable not found.",404);
+   const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p,200,{"Cache-Control":"public, max-age=60, stale-while-revalidate=300"}):bad("Printable not found.",404);
   }
 
   if(url.pathname==="/api/admin/download-history"&&request.method==="GET"){
