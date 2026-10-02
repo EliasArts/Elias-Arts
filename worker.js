@@ -141,6 +141,11 @@ async function publicPrintable(db,slug){
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
+  const trackedPages=new Set(["/","/search","/category.html","/printable.html","/info.html"]);
+  if(request.method==="GET"&&trackedPages.has(url.pathname)){
+    try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:["pageview"],blobs:[url.pathname],doubles:[1]});}catch{}
+  }
+
   if(url.pathname.startsWith("/files/")&&request.method==="GET"){
    const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
    if(!key||key.includes(".."))return bad("Invalid file.",400);
@@ -163,6 +168,17 @@ export default {async fetch(request,env){
     const limit=Math.min(200,Math.max(1,Number(url.searchParams.get("limit")||100)));
     const rows=(await env.DB.prepare("SELECT id,email,status,created_at FROM subscribers WHERE status='active' ORDER BY created_at DESC,id DESC LIMIT ?").bind(limit).all()).results;
     return ok({total:count.total||0,subscribers:rows});
+   }
+   if(url.pathname==="/api/admin/analytics"&&request.method==="GET"){
+    const empty={daily:[],byPrintable:[]};
+    if(!env.ANALYTICS_SQL)return ok(empty);
+    try{
+      const daily=await env.ANALYTICS_SQL.query({query:
+        'SELECT toStartOfDay(timestamp) AS day, blob1 AS event, SUM(_sample_interval * double1) AS count FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day,event ORDER BY day LIMIT 500'});
+      const byPrintable=await env.ANALYTICS_SQL.query({query:
+        'SELECT blob2 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_analytics" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY AND blob1=\'download\' GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
+      return ok({daily:daily.data||[],byPrintable:byPrintable.data||[]});
+    }catch(e){console.error("Analytics query error",e);return ok(empty)}
    }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
     const [totals,cats,topics,downloads]=await Promise.all([
@@ -307,6 +323,7 @@ export default {async fetch(request,env){
    const p=await publicPrintable(env.DB,slug);if(!p)return bad("Printable not found.",404);
    const pdf=p.files.find(f=>f.file_type==="pdf");if(!pdf)return bad("PDF not available.",404);
    const obj=await env.FILES.get(pdf.storage_key);if(!obj)return bad("PDF file not found.",404);
+   try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:[p.slug],blobs:["download",p.slug,p.title],doubles:[1]});}catch{}
    const day=new Date().toISOString().slice(0,10);
    await env.DB.batch([
     env.DB.prepare("UPDATE printables SET download_count=COALESCE(download_count,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(p.id),
