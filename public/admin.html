@@ -85,7 +85,7 @@ async function handleClick(e){
  if(x.dataset.editPrint){openPrintable(printables.find(v=>v.id===Number(x.dataset.editPrint)));return}if(x.dataset.filesPrint){const p=printables.find(v=>v.id===Number(x.dataset.filesPrint));openFiles(p.id,p.title);return}if(x.dataset.delPrint){if(confirm('Delete this printable and its stored files?')){try{await api('/api/admin/printables/'+x.dataset.delPrint,{method:'DELETE'});load()}catch(err){status(err.message,true)}}return}
  if(x.dataset.fileDelete){if(confirm('Delete this file?')){try{await api('/api/admin/printables/files/'+x.dataset.fileDelete,{method:'DELETE'});await renderFileList(Number(x.dataset.printable));await load()}catch(err){$('uploadStatus').textContent=err.message}}}
 }
-$('categories').onclick=handleClick;$('topics').onclick=handleClick;$('printables').onclick=handleClick;$('fileList')?.addEventListener('click',handleClick);
+$('categories').onclick=handleClick;$('topics').onclick=handleClick;$('printables').onclick=handleClick;$('modal').addEventListener('click',handleClick);
 $('newCategoryBtn').onclick=()=>openCategory();$('addCategoryBtn').onclick=()=>openCategory();$('addTopicBtn').onclick=()=>openTopic();$('newPrintableBtn').onclick=()=>openPrintable();$('cancelBtn').onclick=closeModal;
 if(token)showDash();
 </script>
