@@ -64,30 +64,27 @@ async function ensureDatabase(db){
  if(!settingsTable){
   for(const statement of SCHEMA.split(";").map(s=>s.trim()).filter(Boolean)) await db.prepare(statement).run();
  }
- const detailsTable=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='printable_details' LIMIT 1").first();
- if(!detailsTable){
-  await db.prepare("CREATE TABLE IF NOT EXISTS printable_details (printable_id INTEGER PRIMARY KEY,paper_size TEXT NOT NULL DEFAULT 'A4',format_info TEXT NOT NULL DEFAULT 'PDF',page_count INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE)").run();
-  await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
- }
+ const cols=(await db.prepare("PRAGMA table_info(printables)").all()).results||[];
+ const names=new Set(cols.map(c=>c.name));
+ if(!names.has("paper_size")) await db.prepare("ALTER TABLE printables ADD COLUMN paper_size TEXT NOT NULL DEFAULT 'A4'").run();
+ if(!names.has("format_info")) await db.prepare("ALTER TABLE printables ADD COLUMN format_info TEXT NOT NULL DEFAULT 'PDF'").run();
+ if(!names.has("page_count")) await db.prepare("ALTER TABLE printables ADD COLUMN page_count INTEGER NOT NULL DEFAULT 1").run();
  let seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
  if(!seeded){
   const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
   if(!hasCategory){
-   for(const [slug,name,description,sort] of SEED)
-    await db.prepare("INSERT INTO categories(slug,name,description,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(slug,name,description,sort).run();
+   for(const [slug,name,description,sort] of SEED) await db.prepare("INSERT INTO categories(slug,name,description,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(slug,name,description,sort).run();
    for(const [catSlug,items] of Object.entries(TOPICS)){
-    const cat=await db.prepare("SELECT id FROM categories WHERE slug=?").bind(catSlug).first();
-    if(!cat) continue;
-    for(let i=0;i<items.length;i++)
-     await db.prepare("INSERT INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
+    const cat=await db.prepare("SELECT id FROM categories WHERE slug=?").bind(catSlug).first(); if(!cat) continue;
+    for(let i=0;i<items.length;i++) await db.prepare("INSERT INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
    }
   }
   await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','1')").run();
-  seeded={value:"1"};
+  seeded={value:'1'};
  }
  if(Number(seeded.value)<2){
   const cat=await db.prepare("SELECT id FROM categories WHERE slug='planning-organization'").first();
-  if(cat) await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,"reading","Reading",5).run();
+  if(cat) await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,'reading','Reading',5).run();
   await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','2')").run();
  }
 }
