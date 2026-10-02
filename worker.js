@@ -73,6 +73,13 @@ async function ensureDatabase(db){
   await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
  }
  const seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
+ const seedVersion=seeded?.value||'0';
+ if(Number(seedVersion)<2){
+  const cat=await db.prepare("SELECT id FROM categories WHERE slug='planning-organization'").first();
+  if(cat) await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,"reading","Reading",5).run();
+  await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','2')").run();
+  }
+
  if(!seeded){
   const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
   if(!hasCategory){
@@ -226,6 +233,18 @@ export default {async fetch(request,env){
    return bad("Not found.",404);
   }
 
+  if(url.pathname==="/api/navigation"){
+   const rows=(await env.DB.prepare(`SELECT c.id category_id,c.slug category_slug,c.name category_name,
+    t.id topic_id,t.slug topic_slug,t.name topic_name
+    FROM categories c LEFT JOIN topics t ON t.category_id=c.id AND t.is_visible=1
+    WHERE c.is_visible=1 ORDER BY c.sort_order,c.id,t.sort_order,t.id`).all()).results;
+   const map=new Map();
+   for(const r of rows){
+    if(!map.has(r.category_id))map.set(r.category_id,{id:r.category_id,slug:r.category_slug,name:r.category_name,topics:[]});
+    if(r.topic_id)map.get(r.category_id).topics.push({id:r.topic_id,slug:r.topic_slug,name:r.topic_name});
+   }
+   return ok([...map.values()]);
+  }
   if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results);
   if(url.pathname==="/api/topics")return ok((await env.DB.prepare("SELECT t.id,t.slug,t.name,t.description,t.category_id,c.slug category_slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.is_visible=1 AND c.is_visible=1 ORDER BY c.sort_order,t.sort_order,t.id").all()).results);
   if(url.pathname==="/api/printables"){
