@@ -17,7 +17,11 @@ CREATE TABLE IF NOT EXISTS printables (
  description TEXT DEFAULT '', category_id INTEGER, topic_id INTEGER, cover_file_id INTEGER,
  is_featured INTEGER NOT NULL DEFAULT 0, is_published INTEGER NOT NULL DEFAULT 0,
  sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+ updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ paper_size TEXT NOT NULL DEFAULT 'A4',
+ format_info TEXT NOT NULL DEFAULT 'PDF',
+ page_count INTEGER NOT NULL DEFAULT 1,
+ FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
  FOREIGN KEY(topic_id) REFERENCES topics(id) ON DELETE SET NULL
 );
 CREATE TABLE IF NOT EXISTS printable_files (
@@ -40,13 +44,6 @@ CREATE INDEX IF NOT EXISTS idx_printables_topic ON printables(topic_id, is_publi
 CREATE INDEX IF NOT EXISTS idx_printables_category ON printables(category_id, is_published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printable_files_printable ON printable_files(printable_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printables_title ON printables(title);
-CREATE TABLE IF NOT EXISTS printable_details (
- printable_id INTEGER PRIMARY KEY,
- paper_size TEXT NOT NULL DEFAULT 'A4',
- format_info TEXT NOT NULL DEFAULT 'PDF',
- page_count INTEGER NOT NULL DEFAULT 1,
- FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE
-);
 `;
 
 const SEED=[
