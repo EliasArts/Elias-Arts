@@ -57,7 +57,7 @@ const SEED=[
 ["gifts-occasions","Gifts & Occasions","Cards, gift tags, invitations and seasonal printables.",5]];
 const TOPICS={
 "letter-journaling":[["writing","Writing"],["letter-paper","Letter Paper"],["journaling","Journaling"]],
-"planning-organization":[["calendars","Calendars"],["planners","Planners"],["trackers","Trackers"],["study","Study"]],
+"planning-organization":[["calendars","Calendars"],["planners","Planners"],["trackers","Trackers"],["study","Study"],["reading","Reading"]],
 "coloring-creative":[["coloring","Coloring"],["stickers","Stickers"]],
 "decorative":[["paper-crafts","Paper Crafts"],["gift-wrapping","Gift Wrapping"],["wall-art","Wall Art"],["quotes","Quotes"]],
 "gifts-occasions":[["cards","Cards"],["gift-tags","Gift Tags"],["invitations","Invitations"],["seasonal","Seasonal"]]};
