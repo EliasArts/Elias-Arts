@@ -31,6 +31,12 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&g
 function card(p){return '<a class="card" href="/printable/'+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img src="'+p.cover_url+'" alt="'+esc(p.title)+'">':'<span class="placeholder">Preview</span>')+'</div><div class="title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||'Printable')+' · Free</div>'+(p.description?'<div class="desc">'+esc(p.description)+'</div>':'')+'</a>'}
 async function load(){
  try{
+  if(!slug){
+   const r=await fetch('/api/categories'); if(!r.ok)throw Error();
+   const cats=await r.json(); document.title='Categories — Elias Arts'; document.getElementById('crumb').textContent='Categories';
+   root.innerHTML='<section><div class="eyebrow">Elias Arts library</div><h1>Browse categories.</h1><div class="intro">Explore every Elias Arts collection and discover its topics and free printables.</div></section><section class="section"><div class="cards">'+cats.map(x=>'<a class="card" href="/category/'+encodeURIComponent(x.slug)+'"><div class="card-img"><span class="placeholder">Collection</span></div><div class="title">'+esc(x.name)+'</div><div class="desc">'+esc(x.description||'Browse this collection.')+'</div></a>').join('')+'</div></section>';
+   return;
+  }
   const r=await fetch('/api/categories/'+encodeURIComponent(slug)); if(!r.ok)throw Error();
   const c=await r.json(); document.title=c.name+' Printables — Elias Arts'; document.getElementById('crumb').textContent=c.name;
   const topicHtml=c.topics.length?'<div class="topics">'+c.topics.map(t=>'<a class="topic" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join('')+'</div>':'';
