@@ -40,6 +40,13 @@ CREATE INDEX IF NOT EXISTS idx_printables_topic ON printables(topic_id, is_publi
 CREATE INDEX IF NOT EXISTS idx_printables_category ON printables(category_id, is_published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printable_files_printable ON printable_files(printable_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printables_title ON printables(title);
+CREATE TABLE IF NOT EXISTS printable_details (
+ printable_id INTEGER PRIMARY KEY,
+ paper_size TEXT NOT NULL DEFAULT 'A4',
+ format_info TEXT NOT NULL DEFAULT 'PDF',
+ page_count INTEGER NOT NULL DEFAULT 1,
+ FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE
+);
 `;
 
 const SEED=[
@@ -63,7 +70,9 @@ async function ensureDatabase(db){
   const cat=await db.prepare("SELECT id FROM categories WHERE slug=?").bind(catSlug).first(); if(!cat) continue;
   for(let i=0;i<items.length;i++)
    await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,items[i][0],items[i][1],i+1).run();
- }}
+ }
+ await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
+}
 let initialized=false,initPromise;
 async function init(db){if(initialized)return;if(!initPromise)initPromise=ensureDatabase(db).then(()=>{initialized=true}).catch(e=>{initPromise=null;throw e});await initPromise}
 
@@ -83,8 +92,10 @@ function safeKey(s){return String(s||"").replace(/[^a-zA-Z0-9._\/-]/g,"-").repla
 function fileUrl(key){return "/files/"+key.split("/").map(encodeURIComponent).join("/")}
 
 async function publicPrintable(db,slug){
- const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug
+ const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug,
+ d.paper_size,d.format_info,d.page_count
  FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
+ LEFT JOIN printable_details d ON d.printable_id=p.id
  WHERE p.slug=? AND p.is_published=1`).bind(slug).first();
  if(!p)return null;
  const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(p.id).all();
@@ -118,8 +129,23 @@ export default {async fetch(request,env){
    if(!(await validToken(request,env.ADMIN_PASSWORD)))return bad("Unauthorized.",401);
    if(url.pathname==="/api/admin/categories"&&request.method==="GET")return ok((await env.DB.prepare("SELECT * FROM categories ORDER BY sort_order,id").all()).results);
    if(url.pathname==="/api/admin/topics"&&request.method==="GET")return ok((await env.DB.prepare("SELECT t.*,c.name category_name FROM topics t JOIN categories c ON c.id=t.category_id ORDER BY c.sort_order,t.sort_order,t.id").all()).results);
+   if(url.pathname==="/api/admin/subscribers"&&request.method==="GET"){
+    const count=await env.DB.prepare("SELECT COUNT(*) total FROM subscribers WHERE status='active'").first();
+    const limit=Math.min(200,Math.max(1,Number(url.searchParams.get("limit")||100)));
+    const rows=(await env.DB.prepare("SELECT id,email,status,created_at FROM subscribers WHERE status='active' ORDER BY created_at DESC,id DESC LIMIT ?").bind(limit).all()).results;
+    return ok({total:count.total||0,subscribers:rows});
+   }
+   if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
+    const [totals,cats,topics]=await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) total, SUM(CASE WHEN is_published=1 THEN 1 ELSE 0 END) published FROM printables").first(),
+      env.DB.prepare("SELECT c.id,c.name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM categories c LEFT JOIN printables p ON p.category_id=c.id GROUP BY c.id,c.name ORDER BY c.sort_order,c.id").all(),
+      env.DB.prepare("SELECT t.id,t.name,c.name category_name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM topics t JOIN categories c ON c.id=t.category_id LEFT JOIN printables p ON p.topic_id=t.id GROUP BY t.id,t.name,c.name ORDER BY c.sort_order,t.sort_order,t.id")
+    ]);
+    return ok({total:totals.total||0,published:totals.published||0,categories:cats.results,topics:topics.results});
+   }
    if(url.pathname==="/api/admin/printables"&&request.method==="GET"){
     const r=await env.DB.prepare(`SELECT p.*,c.name category_name,t.name topic_name,
+      d.paper_size,d.format_info,d.page_count,
       (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
       FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id ORDER BY p.created_at DESC`).all();
     return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})));
@@ -152,9 +178,9 @@ export default {async fetch(request,env){
     if(request.method==="POST"&&!id){
      const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");
      const slug=slugify(b.slug||title);if(!slug)return bad("A valid slug is required.");
-     try{const r=await env.DB.prepare("INSERT INTO printables(slug,title,description,category_id,topic_id,is_featured,is_published,sort_order) VALUES(?,?,?,?,?,?,?,0)").bind(slug,title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0).run();return ok({success:true,id:r.meta.last_row_id,slug});}catch(e){return bad("Could not create printable. The slug may already exist.",409);}
+     try{const r=await env.DB.prepare("INSERT INTO printables(slug,title,description,category_id,topic_id,is_featured,is_published,sort_order) VALUES(?,?,?,?,?,?,?,0)").bind(slug,title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0).run();const id=r.meta.last_row_id;await env.DB.prepare("INSERT OR IGNORE INTO printable_details(printable_id,paper_size,format_info,page_count) VALUES(?,?,?,?)").bind(id,b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1)).run();return ok({success:true,id,slug});}catch(e){return bad("Could not create printable. The slug may already exist.",409);}
     }
-    if(request.method==="PUT"&&id){const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");await env.DB.prepare("UPDATE printables SET slug=?,title=?,description=?,category_id=?,topic_id=?,is_featured=?,is_published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug||title),title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0,id).run();return ok({success:true});}
+    if(request.method==="PUT"&&id){const b=await jsonBody(request);const title=String(b.title||"").trim();if(!title)return bad("Title is required.");await env.DB.prepare("UPDATE printables SET slug=?,title=?,description=?,category_id=?,topic_id=?,is_featured=?,is_published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug||title),title,b.description||"",b.category_id||null,b.topic_id||null,b.is_featured?1:0,b.is_published?1:0,id).run();await env.DB.prepare("INSERT OR REPLACE INTO printable_details(printable_id,paper_size,format_info,page_count) VALUES(?,?,?,?)").bind(id,b.paper_size||"A4",b.format_info||"PDF",Math.max(1,Number(b.page_count)||1)).run();return ok({success:true});}
     if(request.method==="DELETE"&&id){
      const fs=await env.DB.prepare("SELECT storage_key FROM printable_files WHERE printable_id=?").bind(id).all();
      for(const f of fs.results)await env.FILES.delete(f.storage_key);
@@ -244,6 +270,18 @@ export default {async fetch(request,env){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p):bad("Printable not found.",404);
   }
 
+  if(url.pathname==="/robots.txt"&&request.method==="GET"){
+    return new Response("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nSitemap: https://elias-arts.eliasoscararts.workers.dev/sitemap.xml\n",{headers:{"Content-Type":"text/plain; charset=UTF-8","Cache-Control":"public, max-age=86400"}});
+  }
+  if(url.pathname==="/sitemap.xml"&&request.method==="GET"){
+    const base="https://elias-arts.eliasoscararts.workers.dev";
+    const urls=[base+"/",base+"/search",base+"/category.html?slug=coloring-creative",base+"/category.html?slug=planning-organization",base+"/category.html?slug=letter-journaling",base+"/category.html?slug=decorative",base+"/category.html?slug=gifts-occasions",base+"/info.html?page=about",base+"/info.html?page=contact",base+"/info.html?page=privacy",base+"/info.html?page=terms"];
+    const cats=(await env.DB.prepare("SELECT slug FROM categories WHERE is_visible=1 ORDER BY sort_order").all()).results;
+    const prints=(await env.DB.prepare("SELECT slug FROM printables WHERE is_published=1 ORDER BY created_at DESC").all()).results;
+    const all=[...urls,...cats.map(c=>base+"/category.html?slug="+encodeURIComponent(c.slug)),...prints.map(p=>base+"/printable.html?slug="+encodeURIComponent(p.slug))];
+    const uniq=[...new Set(all)];
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+uniq.map(u=>"<url><loc>"+u.replaceAll("&","&amp;")+"</loc></url>").join("")+"</urlset>",{headers:{"Content-Type":"application/xml; charset=UTF-8","Cache-Control":"public, max-age=3600"}});
+  }
   return env.ASSETS.fetch(request);
  }catch(e){console.error("Elias Arts Worker error",e);return bad("Something went wrong. Please try again.",500)}
 }};
