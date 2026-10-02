@@ -14,7 +14,7 @@ header{height:72px;border-bottom:1px solid var(--border);display:flex;align-item
 .page{padding:42px 0 70px}.page-loading{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:52px;min-height:580px}.loading-preview{min-height:580px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(110deg,var(--paper) 8%,#f3eee4 18%,var(--paper) 33%);background-size:200% 100%;animation:shine 1.2s linear infinite}.loading-copy{padding-top:25px}.loading-copy span{display:block;height:18px;border-radius:8px;background:var(--sand);margin:12px 0}.loading-copy span:nth-child(1){width:42%;height:11px}.loading-copy span:nth-child(2){width:90%;height:70px}.loading-copy span:nth-child(3){width:100%;height:85px}.loading-copy span:nth-child(4){width:100%;height:52px}@keyframes shine{to{background-position:-200% 0}}.crumb{font-size:11px;color:var(--muted);margin-bottom:25px}.crumb a{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:52px;align-items:start}.visual-wrap{display:grid;grid-template-columns:54px minmax(0,1fr);gap:14px;align-items:start}.thumbs{display:flex;flex-direction:column;gap:9px}.thumbs.single{display:none}.visual-wrap:has(.thumbs.single){grid-template-columns:1fr}.thumb{width:54px;height:68px;background:var(--paper);border:1px solid var(--border);border-radius:7px;overflow:hidden;cursor:pointer;padding:0}.thumb.active{border:2px solid var(--sage-dark)}.thumb img{width:100%;height:100%;object-fit:cover}.preview{background:var(--paper);border:1px solid var(--border);min-height:580px;display:flex;align-items:center;justify-content:center;padding:20px}.preview img{display:block;width:100%;height:auto;max-height:730px;object-fit:contain}.placeholder{color:var(--muted);font-size:12px}.info{padding-top:2px}.eyebrow{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(42px,5vw,62px);line-height:1;letter-spacing:-1px;margin:13px 0 18px}.desc{color:var(--muted);font-size:14px;line-height:1.8}.meta{display:flex;flex-wrap:wrap;gap:9px;margin:20px 0}.pill{border:1px solid var(--border);background:var(--paper);border-radius:999px;padding:7px 11px;font-size:10px}.download{display:block;text-align:center;background:var(--sage-dark);color:#fff;border-radius:999px;padding:14px 20px;font-size:13px;font-weight:700;margin:23px 0 9px;box-shadow:0 10px 25px rgba(82,105,92,.16)}.file-note,.note{font-size:11px;color:var(--muted);text-align:center}.share{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);background:var(--paper);color:var(--ink);border-radius:999px;padding:12px;font:600 12px Manrope;cursor:pointer}.share svg{width:15px;height:15px;fill:currentColor}.related{border-top:1px solid var(--border);padding:35px 0 75px}.related h2{font-size:30px;margin:0 0 18px}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:18px}.card-img{aspect-ratio:.72;background:var(--paper);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:grid;place-items:center}.card-img img{width:100%;height:100%;object-fit:contain}.card-title{font-family:"DM Serif Display";font-size:17px;margin-top:9px}.card-meta{font-size:10px;color:var(--muted)}.empty{text-align:center;padding:70px 0;color:var(--muted)}footer{border-top:1px solid var(--border);background:var(--sand);padding:30px 0}.foot{display:flex;justify-content:space-between;gap:20px;color:var(--muted);font-size:11px}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.page-loading{grid-template-columns:1fr}.loading-preview{min-height:420px}.loading-copy{padding-top:0}.info{padding-top:0}.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:620px){.container{width:calc(100% - 28px)}header{height:62px}.logo{font-size:25px}.nav-actions{gap:14px}.visual-wrap{grid-template-columns:1fr}.thumbs{order:2;flex-direction:row;overflow:auto}.thumb{flex:0 0 60px}.preview{min-height:420px}.cards{grid-template-columns:1fr 1fr}.foot{flex-direction:column}}
 </style>
-</head>
+<style>.cat-menu-loading{font-size:12px;color:var(--muted);padding:8px 0}</style></head>
 <body>
 <header><div class="container nav"><a class="logo" href="/">EliasArts</a><nav class="nav-actions"><a href="/search">Search</a><div class="cat-menu-wrap"><button class="cat-menu-btn" id="catMenuBtn" type="button" aria-expanded="false">Categories <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button><div class="cat-menu" id="catMenu"><div class="cat-menu-title">Browse categories</div><div id="catMenuGrid" class="cat-menu-grid"></div></div></div><a href="/info.html?page=about">About</a></nav></div></header>
 <main class="container page" id="page"><div id="content"><div class="page-loading" aria-label="Loading printable"><div class="loading-preview"></div><div class="loading-copy"><span></span><span></span><span></span><span></span></div></div></div></main>
@@ -35,5 +35,29 @@ async function load(){
   document.getElementById('shareBtn')?.addEventListener('click',async()=>{try{if(navigator.share){await navigator.share({title:p.title,url:location.href})}else{await navigator.clipboard.writeText(location.href);alert('Link copied.')};}catch(e){}});
  }catch(e){root.innerHTML='<div class="empty"><h1>Printable unavailable.</h1><p>We could not load this printable right now.</p><a href="/search" style="text-decoration:underline">Browse printables</a></div>'}
 }
-async function loadCategoryMenu(){try{const[a,b]=await Promise.all([fetch('/api/categories'),fetch('/api/topics')]);if(!a.ok||!b.ok)throw Error();const cats=await a.json(),topics=await b.json(),by={};topics.forEach(t=>(by[t.category_id]??=[]).push(t));const grid=document.getElementById('catMenuGrid');if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+((by[c.id]||[]).map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join(''))+'</div>').join('')}catch(e){console.error(e)}}const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');cmb?.addEventListener('click',e=>{e.stopPropagation();const open=cm.classList.toggle('open');cmb.setAttribute('aria-expanded',open?'true':'false')});document.addEventListener('click',()=>{cm?.classList.remove('open');cmb?.setAttribute('aria-expanded','false')});loadCategoryMenu();load();
+
+let catMenuLoaded=false;
+async function loadCategoryMenu(){
+ if(catMenuLoaded)return;
+ catMenuLoaded=true;
+ const grid=document.getElementById('catMenuGrid');
+ if(grid)grid.innerHTML='<div class="cat-menu-loading">Loading categories…</div>';
+ try{
+  const r=await fetch('/api/navigation');
+  if(!r.ok)throw Error();
+  const cats=await r.json();
+  if(grid)grid.innerHTML=cats.map(c=>'<div class="cat-menu-col"><a href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>'+c.topics.map(t=>'<a class="topic-link" href="/search?q='+encodeURIComponent(t.name)+'">'+esc(t.name)+'</a>').join('')+'</div>').join('');
+ }catch(e){
+  catMenuLoaded=false;
+  if(grid)grid.innerHTML='<div class="cat-menu-loading">Categories could not be loaded. Please try again.</div>';
+ }
+}
+const cmb=document.getElementById('catMenuBtn'),cm=document.getElementById('catMenu');
+cmb?.addEventListener('click',e=>{
+ e.stopPropagation();
+ const open=cm.classList.toggle('open');
+ cmb.setAttribute('aria-expanded',open?'true':'false');
+ if(open)loadCategoryMenu();
+});
+document.addEventListener('click',()=>{cm?.classList.remove('open');cmb?.setAttribute('aria-expanded','false')});
 </script></body></html>
