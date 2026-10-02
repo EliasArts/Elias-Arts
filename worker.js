@@ -183,12 +183,13 @@ export default {async fetch(request,env){
     }catch(e){console.error("Analytics query error",e);return ok(empty)}
    }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
-    const [totals,cats,topics,downloads]=await Promise.all([
+    const [totals,cats,topics,subs]=await Promise.all([
       env.DB.prepare("SELECT COUNT(*) total, SUM(CASE WHEN is_published=1 THEN 1 ELSE 0 END) published, COALESCE(SUM(download_count),0) downloads FROM printables").first(),
       env.DB.prepare("SELECT c.id,c.name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM categories c LEFT JOIN printables p ON p.category_id=c.id GROUP BY c.id,c.name ORDER BY c.sort_order,c.id").all(),
-      env.DB.prepare("SELECT t.id,t.name,c.name category_name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM topics t JOIN categories c ON c.id=t.category_id LEFT JOIN printables p ON p.topic_id=t.id GROUP BY t.id,t.name,c.name ORDER BY c.sort_order,t.sort_order,t.id")
+      env.DB.prepare("SELECT t.id,t.name,c.name category_name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM topics t JOIN categories c ON c.id=t.category_id LEFT JOIN printables p ON p.topic_id=t.id GROUP BY t.id,t.name,c.name ORDER BY c.sort_order,t.sort_order,t.id").all(),
+      env.DB.prepare("SELECT COUNT(*) total FROM subscribers WHERE status='active'").first()
     ]);
-    return ok({total:totals.total||0,published:totals.published||0,downloads:totals.downloads||0,categories:cats.results,topics:topics.results});
+    return ok({total:totals.total||0,published:totals.published||0,downloads:totals.downloads||0,subscribers:subs.total||0,categories:cats.results,topics:topics.results});
    }
    if(url.pathname==="/api/admin/printables"&&request.method==="GET"){
     const r=await env.DB.prepare(`SELECT p.*,c.name category_name,t.name topic_name,
