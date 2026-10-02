@@ -88,12 +88,26 @@ async function publicPrintable(db,slug){
  WHERE p.slug=? AND p.is_published=1`).bind(slug).first();
  if(!p)return null;
  const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(p.id).all();
- return {...p,files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)}))};
+ const rel=await db.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
+   (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
+   FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
+   WHERE p.is_published=1 AND p.id<>? AND (p.category_id=? OR p.topic_id=?) ORDER BY p.created_at DESC LIMIT 6`).bind(p.id,p.category_id,p.topic_id).all();
+ return {...p,
+   files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)})),
+   related:rel.results.map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null}))
+ };
 }
 
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
+  if(url.pathname.startsWith("/files/")&&request.method==="GET"){
+   const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
+   if(!key||key.includes(".."))return bad("Invalid file.",400);
+   const obj=await env.FILES.get(key);if(!obj)return bad("File not found.",404);
+   const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
+   return new Response(obj.body,{headers});
+  }
   await init(env.DB);
   if(url.pathname==="/api/admin/login"&&request.method==="POST"){
    if(!env.ADMIN_PASSWORD)return bad("Admin password is not configured in Cloudflare yet.",503);
@@ -113,9 +127,19 @@ export default {async fetch(request,env){
    let m;
    if((m=url.pathname.match(/^\/api\/admin\/categories\/?(\d+)?$/))){
     const id=m[1];
-    if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug)return bad("Name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").first();await env.DB.prepare("INSERT INTO categories(slug,name,description,banner_key,sort_order,is_visible) VALUES(?,?,?,?,?,1)").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),max.n).run();return ok({success:true});}
+    if(request.method==="POST"&&!id){const b=await jsonBody(request);if(!b.name||!b.slug)return bad("Name and slug are required.");const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").first();const r=await env.DB.prepare("INSERT INTO categories(slug,name,description,banner_key,sort_order,is_visible) VALUES(?,?,?,?,?,1)").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),max.n).run();return ok({success:true,id:r.meta.last_row_id});}
     if(request.method==="PUT"&&id){const b=await jsonBody(request);await env.DB.prepare("UPDATE categories SET slug=?,name=?,description=?,banner_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(slugify(b.slug),String(b.name).trim(),b.description||"",safeKey(b.banner_key||""),id).run();return ok({success:true});}
-    if(request.method==="DELETE"&&id){await env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id).run();return ok({success:true});}
+    if(request.method==="DELETE"&&id){const c=await env.DB.prepare("SELECT banner_key FROM categories WHERE id=?").bind(id).first();if(c?.banner_key)await env.FILES.delete(c.banner_key);await env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id).run();return ok({success:true});}
+   }
+   if((m=url.pathname.match(/^\/api\/admin\/categories\/(\d+)\/banner$/))&&request.method==="POST"){
+    const id=m[1];const c=await env.DB.prepare("SELECT id,banner_key FROM categories WHERE id=?").bind(id).first();if(!c)return bad("Category not found.",404);
+    const form=await request.formData();const file=form.get("file");
+    if(!(file instanceof File)||!String(file.type||"").startsWith("image/"))return bad("Please choose an image for the category banner.");
+    const clean=String(file.name||"banner").replace(/[^a-zA-Z0-9._-]/g,"-");const key="categories/"+id+"/banner/"+Date.now()+"-"+clean;
+    await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type||"image/jpeg",cacheControl:"public,max-age=31536000"}});
+    if(c.banner_key)await env.FILES.delete(c.banner_key);
+    await env.DB.prepare("UPDATE categories SET banner_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(key,id).run();
+    return ok({success:true,url:fileUrl(key)});
    }
    if((m=url.pathname.match(/^\/api\/admin\/topics\/?(\d+)?$/))){
     const id=m[1];
@@ -136,6 +160,10 @@ export default {async fetch(request,env){
      for(const f of fs.results)await env.FILES.delete(f.storage_key);
      await env.DB.prepare("DELETE FROM printables WHERE id=?").bind(id).run();return ok({success:true});
     }
+   }
+   if((m=url.pathname.match(/^\/api\/admin\/printables\/(\d+)\/files$/))&&request.method==="GET"){
+    const rows=(await env.DB.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(m[1]).all()).results;
+    return ok(rows.map(x=>({...x,url:fileUrl(x.storage_key)})));
    }
    if((m=url.pathname.match(/^\/api\/admin\/printables\/(\d+)\/files$/))&&request.method==="POST"){
     const id=m[1];const exists=await env.DB.prepare("SELECT id FROM printables WHERE id=?").bind(id).first();if(!exists)return bad("Printable not found.",404);
@@ -204,16 +232,18 @@ export default {async fetch(request,env){
     WHERE p.is_published=1 AND p.category_id=? ORDER BY p.created_at DESC LIMIT 60`).bind(c.id).all();
    return ok({...c,banner_url:c.banner_key?fileUrl(c.banner_key):null,topics,printables:r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null}))});
   }
+  if(url.pathname.startsWith("/api/printables/")&&url.pathname.endsWith("/download")){
+   const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length,-"/download".length)).replace(/\/$/,"");
+   const p=await publicPrintable(env.DB,slug);if(!p)return bad("Printable not found.",404);
+   const pdf=p.files.find(f=>f.file_type==="pdf");if(!pdf)return bad("PDF not available.",404);
+   const obj=await env.FILES.get(pdf.storage_key);if(!obj)return bad("PDF file not found.",404);
+   const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("Content-Type","application/pdf");headers.set("Content-Disposition",`attachment; filename="${String(pdf.original_name||p.title+".pdf").replace(/["\\]/g,"-")}"`);
+   return new Response(obj.body,{headers});
+  }
   if(url.pathname.startsWith("/api/printables/")){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p):bad("Printable not found.",404);
   }
-  if(url.pathname.startsWith("/files/")){
-   const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
-   if(!key||key.includes(".."))return bad("Invalid file.",400);
-   const obj=await env.FILES.get(key);if(!obj)return bad("File not found.",404);
-   const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
-   return new Response(obj.body,{headers});
-  }
+
   return env.ASSETS.fetch(request);
- }catch(e){return bad("Server error: "+e.message,500)}
+ }catch(e){console.error("Elias Arts Worker error",e);return bad("Something went wrong. Please try again.",500)}
 }};
