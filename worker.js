@@ -157,7 +157,7 @@ export default {async fetch(request,env){
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("etag",obj.httpEtag);
    return new Response(obj.body,{headers});
   }
-  if(url.pathname.startsWith("/api/admin/")||url.pathname==="/api/subscribe"||url.pathname==="/sitemap.xml") await init(env.DB);
+  if(url.pathname.startsWith("/api/")||url.pathname==="/sitemap.xml") await init(env.DB);
   if(url.pathname==="/api/admin/login"&&request.method==="POST"){
    if(!env.ADMIN_PASSWORD)return bad("Admin password is not configured in Cloudflare yet.",503);
    const b=await jsonBody(request);if(!b.password||b.password!==env.ADMIN_PASSWORD)return bad("Incorrect password.",401);
