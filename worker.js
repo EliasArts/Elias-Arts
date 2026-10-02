@@ -44,6 +44,15 @@ CREATE INDEX IF NOT EXISTS idx_topics_category ON topics(category_id, sort_order
 CREATE INDEX IF NOT EXISTS idx_printables_topic ON printables(topic_id, is_published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printables_category ON printables(category_id, is_published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_printable_files_printable ON printable_files(printable_id, sort_order);
+CREATE TABLE IF NOT EXISTS download_daily (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ printable_id INTEGER NOT NULL,
+ day TEXT NOT NULL,
+ downloads INTEGER NOT NULL DEFAULT 0,
+ UNIQUE(printable_id,day),
+ FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_download_daily_day ON download_daily(day);
 CREATE INDEX IF NOT EXISTS idx_printables_title ON printables(title);
 `;
 
@@ -71,6 +80,11 @@ async function ensureDatabase(db){
  if(!names.has("format_info")) await db.prepare("ALTER TABLE printables ADD COLUMN format_info TEXT NOT NULL DEFAULT 'PDF'").run();
  if(!names.has("page_count")) await db.prepare("ALTER TABLE printables ADD COLUMN page_count INTEGER NOT NULL DEFAULT 1").run();
  if(!names.has("download_count")) await db.prepare("ALTER TABLE printables ADD COLUMN download_count INTEGER NOT NULL DEFAULT 0").run();
+ const dailyTable=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='download_daily' LIMIT 1").first();
+ if(!dailyTable){
+  await db.prepare("CREATE TABLE IF NOT EXISTS download_daily (id INTEGER PRIMARY KEY AUTOINCREMENT,printable_id INTEGER NOT NULL,day TEXT NOT NULL,downloads INTEGER NOT NULL DEFAULT 0,UNIQUE(printable_id,day),FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE)").run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_download_daily_day ON download_daily(day)").run();
+ }
  let seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
  if(!seeded){
   const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
@@ -211,6 +225,10 @@ export default {async fetch(request,env){
     if(!(file instanceof File)||!["cover","preview","page","pdf"].includes(type))return bad("File and valid file type are required.");
     if(type==="pdf"&&!String(file.type).toLowerCase().includes("pdf"))return bad("The PDF upload must be a PDF file.");
     const original=String(file.name||"file");const clean=original.replace(/[^a-zA-Z0-9._-]/g,"-");
+    if(type==="cover"||type==="pdf"){
+     const previous=(await env.DB.prepare("SELECT id,storage_key FROM printable_files WHERE printable_id=? AND file_type=?").bind(id,type).all()).results;
+     for(const old of previous){await env.FILES.delete(old.storage_key);await env.DB.prepare("DELETE FROM printable_files WHERE id=?").bind(old.id).run();}
+    }
     const page=Number(form.get("page_number")||0);const key="printables/"+id+"/"+type+"/"+Date.now()+"-"+clean;
     await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type||"application/octet-stream",cacheControl:"public,max-age=31536000"}});
     const max=await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0)+1 n FROM printable_files WHERE printable_id=?").bind(id).first();
@@ -220,7 +238,7 @@ export default {async fetch(request,env){
     return ok({success:true,id:r.meta.last_row_id,url:fileUrl(key)});
    }
    if((m=url.pathname.match(/^\/api\/admin\/printables\/files\/(\d+)$/))&&request.method==="DELETE"){
-    const f=await env.DB.prepare("SELECT storage_key FROM printable_files WHERE id=?").bind(m[1]).first();if(f)await env.FILES.delete(f.storage_key);await env.DB.prepare("DELETE FROM printable_files WHERE id=?").bind(m[1]).run();return ok({success:true});
+    const f=await env.DB.prepare("SELECT storage_key,printable_id,file_type FROM printable_files WHERE id=?").bind(m[1]).first();if(f)await env.FILES.delete(f.storage_key);await env.DB.prepare("DELETE FROM printable_files WHERE id=?").bind(m[1]).run();if(f?.file_type==="cover")await env.DB.prepare("UPDATE printables SET cover_file_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(f.printable_id).run();return ok({success:true});
    }
    return bad("Not found.",404);
   }
@@ -289,12 +307,25 @@ export default {async fetch(request,env){
    const p=await publicPrintable(env.DB,slug);if(!p)return bad("Printable not found.",404);
    const pdf=p.files.find(f=>f.file_type==="pdf");if(!pdf)return bad("PDF not available.",404);
    const obj=await env.FILES.get(pdf.storage_key);if(!obj)return bad("PDF file not found.",404);
-   await env.DB.prepare("UPDATE printables SET download_count=COALESCE(download_count,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(p.id).run();
+   const day=new Date().toISOString().slice(0,10);
+   await env.DB.batch([
+    env.DB.prepare("UPDATE printables SET download_count=COALESCE(download_count,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(p.id),
+    env.DB.prepare("INSERT INTO download_daily(printable_id,day,downloads) VALUES(?,?,1) ON CONFLICT(printable_id,day) DO UPDATE SET downloads=downloads+1").bind(p.id,day)
+   ]);
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("Content-Type","application/pdf");headers.set("Content-Disposition",`attachment; filename="${String(pdf.original_name||p.title+".pdf").replace(/["\\]/g,"-")}"`);
    return new Response(obj.body,{headers});
   }
   if(url.pathname.startsWith("/api/printables/")){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p):bad("Printable not found.",404);
+  }
+
+  if(url.pathname==="/api/admin/download-history"&&request.method==="GET"){
+   if(!(await validToken(request,env.ADMIN_PASSWORD)))return bad("Unauthorized.",401);
+   const [daily,byPrintable]=await Promise.all([
+    env.DB.prepare("SELECT day,SUM(downloads) downloads FROM download_daily WHERE day>=date('now','-13 day') GROUP BY day ORDER BY day").all(),
+    env.DB.prepare("SELECT p.id,p.title,COALESCE(SUM(d.downloads),0) downloads FROM printables p LEFT JOIN download_daily d ON d.printable_id=p.id GROUP BY p.id,p.title ORDER BY downloads DESC,p.created_at DESC").all()
+   ]);
+   return ok({daily:daily.results,byPrintable:byPrintable.results});
   }
 
   if(url.pathname==="/robots.txt"&&request.method==="GET"){
