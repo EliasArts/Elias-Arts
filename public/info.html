@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Elias Arts</title><meta name="description" content="About Elias Arts.">
+<title>Elias Arts — Free Printables</title><meta name="description" content="Learn more about Elias Arts, a free printable library for creativity, planning, learning, decorating and gifting."><meta name="robots" content="index,follow"><meta property="og:type" content="website"><meta property="og:site_name" content="Elias Arts">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -18,9 +18,9 @@ header{height:72px;border-bottom:1px solid var(--border);display:flex;align-item
 const pages={
  about:{title:'About Elias Arts',body:'<p>Elias Arts is a growing library of thoughtfully designed free printables for everyday creativity, planning, learning, decorating and gifting.</p><p>The goal is simple: make useful, beautiful printable resources easy to discover and free to download.</p>'},
  contact:{title:'Contact',body:'<p>For questions, feedback, corrections or collaboration enquiries, use the contact method published by Elias Arts.</p><p>A dedicated contact address or form can be added here when the project is ready for it.</p>'},
- privacy:{title:'Privacy Policy',body:'<p>Elias Arts is designed to collect as little information as practical. When you subscribe, your email address is stored so Elias Arts can send updates about new printables.</p><p>Cloudflare may process technical information needed to deliver and secure the website. The final privacy policy should be expanded before advertising or analytics are enabled.</p>'},
+ privacy:{title:'Privacy Policy',body:'<p>Elias Arts is designed to collect as little information as practical. When you subscribe, your email address is stored so Elias Arts can send updates about new printables.</p><p>Elias Arts also uses privacy-conscious site analytics to understand page views and printable downloads. The custom analytics used by the site does not intentionally record subscriber email addresses or IP addresses.</p><p>Cloudflare may process technical information needed to deliver and secure the website. This policy should be reviewed and expanded before any additional advertising, analytics or third-party services are introduced.</p>'},
  terms:{title:'Terms of Use',body:'<p>Unless a printable says otherwise, Elias Arts downloads are provided for personal use. Do not resell, redistribute or upload the original files as your own.</p><p>Printable-specific licensing information takes precedence over this general guidance.</p>'}
 };
 const key=new URLSearchParams(location.search).get('page')||'about';const p=pages[key]||pages.about;
-document.title=p.title+' — Elias Arts';document.getElementById('title').textContent=p.title;document.getElementById('crumb').textContent=p.title;document.getElementById('body').innerHTML=p.body;
+document.title=p.title+' — Elias Arts';const dm=document.querySelector('meta[name="description"]');if(dm)dm.content=p.title==='Privacy Policy'?'How Elias Arts handles subscriptions, analytics and technical website information.':p.title==='Contact'?'Contact Elias Arts about the free printable library.':p.title==='Terms of Use'?'Terms for using and sharing Elias Arts free printable downloads.':'About Elias Arts and its free printable library.';document.getElementById('title').textContent=p.title;document.getElementById('crumb').textContent=p.title;document.getElementById('body').innerHTML=p.body;
 </script></body></html>
