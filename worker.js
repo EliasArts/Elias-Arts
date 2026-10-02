@@ -156,17 +156,18 @@ export default {async fetch(request,env){
     return ok({total:count.total||0,subscribers:rows});
    }
    if(url.pathname==="/api/admin/analytics"&&request.method==="GET"){
-    const empty={traffic30d:0,downloads30d:0,downloadsToday:0,daily:[],byPrintable:[]};
+    const empty={traffic30d:0,downloads30d:0,downloads90d:0,downloadsToday:0,daily:[],trafficDaily:[],byPrintable:[]};
     if(!env.ANALYTICS_SQL)return ok(empty);
     try{
       const r1=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
       const r2=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
       const r3=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'1\' DAY'});
       const r4=await env.ANALYTICS_SQL.query({query:'SELECT blob1 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
+      const r4b=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY'});
       const r5=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
       const r6=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
 
-      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[],trafficDaily:r6.data||[]});
+      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloads90d:Number(r4b.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[],trafficDaily:r6.data||[]});
     }catch{return ok(empty)}
    }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
