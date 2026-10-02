@@ -19,7 +19,7 @@ loadHome();
 const sf=document.getElementById('subscribeForm');
 if(sf)sf.addEventListener('submit',async e=>{
  e.preventDefault();const b=sf.querySelector('button');b.disabled=true;
- try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('subscribeEmail').value})});const text=await r.text();let d={};try{d=JSON.parse(text)}catch{throw Error('We could not complete your subscription right now. Please try again.')};if(!r.ok)throw Error(d.error||'Could not subscribe');sf.innerHTML='<div class="subscribed">'+(d.already_subscribed?'Already subscribed':'Subscribed')+'</div>';sf.classList.add('subscribed-state')}
+ try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('subscribeEmail').value})});const text=await r.text();let d={};try{d=JSON.parse(text)}catch{throw Error('We could not complete your subscription right now. Please try again.')};if(!r.ok)throw Error(d.error||'Could not subscribe');if(d.already_subscribed){let msg=document.getElementById('subscribeMessage');if(!msg){msg=document.createElement('div');msg.id='subscribeMessage';msg.className='subscribe-message';sf.appendChild(msg)}msg.textContent='This email is already subscribed to Elias Arts. Please use another email address.';document.getElementById('subscribeEmail').value=''}else{sf.innerHTML='<div class="subscribed">Subscribed</div>';sf.classList.add('subscribed-state')}}
  catch(err){b.disabled=false;b.textContent=err.message}
 });
 const donate=document.getElementById('donateBtn');
