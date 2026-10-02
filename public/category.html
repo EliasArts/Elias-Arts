@@ -29,7 +29,7 @@ footer{border-top:1px solid var(--border);background:var(--sand);padding:30px 0}
 <script>
 const slug=new URLSearchParams(location.search).get('slug')||'';
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-let data=null,active='all';
+let data=null,active=new URLSearchParams(location.search).get('topic')||'all';
 function card(p){return '<a class="card" href="/printable.html?slug='+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img loading="lazy" src="'+p.cover_url+'" alt="'+esc(p.title)+'">':'<span class="placeholder">Preview</span>')+'</div><div class="title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||p.category_name||'Printable')+' · Free</div>'+(p.description?'<div class="desc">'+esc(p.description)+'</div>':'')+'</a>'}
 function render(){$('loading').style.display='none';const topic=active==='all'?null:data.topics.find(t=>t.id===Number(active));const arr=topic?data.printables.filter(p=>p.topic_name===topic.name):data.printables;$('results').innerHTML=arr.map(card).join('');$('empty').style.display=arr.length?'none':'block'}
 async function load(){
