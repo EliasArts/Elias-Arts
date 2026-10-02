@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS printables (
  paper_size TEXT NOT NULL DEFAULT 'A4',
  format_info TEXT NOT NULL DEFAULT 'PDF',
  page_count INTEGER NOT NULL DEFAULT 1,
+ download_count INTEGER NOT NULL DEFAULT 0,
  FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
  FOREIGN KEY(topic_id) REFERENCES topics(id) ON DELETE SET NULL
 );
@@ -69,6 +70,7 @@ async function ensureDatabase(db){
  if(!names.has("paper_size")) await db.prepare("ALTER TABLE printables ADD COLUMN paper_size TEXT NOT NULL DEFAULT 'A4'").run();
  if(!names.has("format_info")) await db.prepare("ALTER TABLE printables ADD COLUMN format_info TEXT NOT NULL DEFAULT 'PDF'").run();
  if(!names.has("page_count")) await db.prepare("ALTER TABLE printables ADD COLUMN page_count INTEGER NOT NULL DEFAULT 1").run();
+ if(!names.has("download_count")) await db.prepare("ALTER TABLE printables ADD COLUMN download_count INTEGER NOT NULL DEFAULT 0").run();
  let seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
  if(!seeded){
   const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
@@ -125,11 +127,6 @@ async function publicPrintable(db,slug){
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
-  const pagePaths=new Set(["/","/search","/category.html","/printable.html","/info.html"]);
-  if(request.method==="GET"&&pagePaths.has(url.pathname)){
-   try{env.TRAFFIC?.writeDataPoint({indexes:[url.hostname],blobs:[url.pathname],doubles:[1]});}catch{}
-  }
-
   if(url.pathname.startsWith("/files/")&&request.method==="GET"){
    const key=url.pathname.slice("/files/".length).split("/").map(decodeURIComponent).join("/");
    if(!key||key.includes(".."))return bad("Invalid file.",400);
@@ -153,28 +150,13 @@ export default {async fetch(request,env){
     const rows=(await env.DB.prepare("SELECT id,email,status,created_at FROM subscribers WHERE status='active' ORDER BY created_at DESC,id DESC LIMIT ?").bind(limit).all()).results;
     return ok({total:count.total||0,subscribers:rows});
    }
-   if(url.pathname==="/api/admin/analytics"&&request.method==="GET"){
-    const empty={traffic30d:0,downloads30d:0,downloads90d:0,downloadsToday:0,daily:[],trafficDaily:[],byPrintable:[]};
-    if(!env.ANALYTICS_SQL)return ok(empty);
-    try{
-      const r1=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
-      const r2=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'30\' DAY'});
-      const r3=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'1\' DAY'});
-      const r4=await env.ANALYTICS_SQL.query({query:'SELECT blob1 AS printable, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY GROUP BY printable ORDER BY downloads DESC LIMIT 100'});
-      const r4b=await env.ANALYTICS_SQL.query({query:'SELECT SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'90\' DAY'});
-      const r5=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS downloads FROM events.analyticsEngine."elias_arts_downloads" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
-      const r6=await env.ANALYTICS_SQL.query({query:'SELECT toStartOfDay(timestamp) AS day, SUM(_sample_interval * double1) AS requests FROM events.analyticsEngine."elias_arts_traffic" WHERE timestamp >= NOW() - INTERVAL \'14\' DAY GROUP BY day ORDER BY day'});
-
-      return ok({traffic30d:Number(r1.data?.[0]?.requests||0),downloads30d:Number(r2.data?.[0]?.downloads||0),downloads90d:Number(r4b.data?.[0]?.downloads||0),downloadsToday:Number(r3.data?.[0]?.downloads||0),byPrintable:r4.data||[],daily:r5.data||[],trafficDaily:r6.data||[]});
-    }catch{return ok(empty)}
-   }
    if(url.pathname==="/api/admin/stats"&&request.method==="GET"){
-    const [totals,cats,topics]=await Promise.all([
-      env.DB.prepare("SELECT COUNT(*) total, SUM(CASE WHEN is_published=1 THEN 1 ELSE 0 END) published FROM printables").first(),
+    const [totals,cats,topics,downloads]=await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) total, SUM(CASE WHEN is_published=1 THEN 1 ELSE 0 END) published, COALESCE(SUM(download_count),0) downloads FROM printables").first(),
       env.DB.prepare("SELECT c.id,c.name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM categories c LEFT JOIN printables p ON p.category_id=c.id GROUP BY c.id,c.name ORDER BY c.sort_order,c.id").all(),
       env.DB.prepare("SELECT t.id,t.name,c.name category_name,COUNT(p.id) total,SUM(CASE WHEN p.is_published=1 THEN 1 ELSE 0 END) published FROM topics t JOIN categories c ON c.id=t.category_id LEFT JOIN printables p ON p.topic_id=t.id GROUP BY t.id,t.name,c.name ORDER BY c.sort_order,t.sort_order,t.id")
     ]);
-    return ok({total:totals.total||0,published:totals.published||0,categories:cats.results,topics:topics.results});
+    return ok({total:totals.total||0,published:totals.published||0,downloads:totals.downloads||0,categories:cats.results,topics:topics.results});
    }
    if(url.pathname==="/api/admin/printables"&&request.method==="GET"){
     const r=await env.DB.prepare(`SELECT p.*,c.name category_name,t.name topic_name,
@@ -307,7 +289,7 @@ export default {async fetch(request,env){
    const p=await publicPrintable(env.DB,slug);if(!p)return bad("Printable not found.",404);
    const pdf=p.files.find(f=>f.file_type==="pdf");if(!pdf)return bad("PDF not available.",404);
    const obj=await env.FILES.get(pdf.storage_key);if(!obj)return bad("PDF file not found.",404);
-   try{env.DOWNLOADS?.writeDataPoint({indexes:[slug],blobs:[slug,p.title],doubles:[1]});}catch{}
+   await env.DB.prepare("UPDATE printables SET download_count=COALESCE(download_count,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(p.id).run();
    const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("Content-Type","application/pdf");headers.set("Content-Disposition",`attachment; filename="${String(pdf.original_name||p.title+".pdf").replace(/["\\]/g,"-")}"`);
    return new Response(obj.body,{headers});
   }
