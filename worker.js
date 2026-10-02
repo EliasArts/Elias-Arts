@@ -72,14 +72,7 @@ async function ensureDatabase(db){
   await db.prepare("CREATE TABLE IF NOT EXISTS printable_details (printable_id INTEGER PRIMARY KEY,paper_size TEXT NOT NULL DEFAULT 'A4',format_info TEXT NOT NULL DEFAULT 'PDF',page_count INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(printable_id) REFERENCES printables(id) ON DELETE CASCADE)").run();
   await db.prepare("INSERT OR IGNORE INTO printable_details(printable_id) SELECT id FROM printables").run();
  }
- const seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
- const seedVersion=seeded?.value||'0';
- if(Number(seedVersion)<2){
-  const cat=await db.prepare("SELECT id FROM categories WHERE slug='planning-organization'").first();
-  if(cat) await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,"reading","Reading",5).run();
-  await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','2')").run();
-  }
-
+ let seeded=await db.prepare("SELECT value FROM site_settings WHERE key='seed_version' LIMIT 1").first();
  if(!seeded){
   const hasCategory=await db.prepare("SELECT 1 FROM categories LIMIT 1").first();
   if(!hasCategory){
@@ -93,6 +86,12 @@ async function ensureDatabase(db){
    }
   }
   await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','1')").run();
+  seeded={value:"1"};
+ }
+ if(Number(seeded.value)<2){
+  const cat=await db.prepare("SELECT id FROM categories WHERE slug='planning-organization'").first();
+  if(cat) await db.prepare("INSERT OR IGNORE INTO topics(category_id,slug,name,sort_order,is_visible) VALUES(?,?,?,?,1)").bind(cat.id,"reading","Reading",5).run();
+  await db.prepare("INSERT OR REPLACE INTO site_settings(key,value) VALUES('seed_version','2')").run();
  }
 }
 let initialized=false,initPromise;
