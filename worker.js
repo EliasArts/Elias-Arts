@@ -129,7 +129,8 @@ async function servePreloadedPage(env,request,path,data){
  const html=await asset.text();
  const safe=JSON.stringify(data).replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026");
  const injected="<script>window.__ELIAS_PRELOADED__="+safe+";<\\/script>";
- return new Response(html.replace("</head>",injected+"</head>"),{status:asset.status,headers:new Headers(asset.headers)});
+ const boot=path==="/printable.html"?"<script>window.__ELIAS_PRINTABLE_BOOT__=1;document.addEventListener('DOMContentLoaded',()=>{if(typeof load==='function'&&!window.__ELIAS_PRINTABLE_STARTED__)load()});<\/script>":"";
+ return new Response(html.replace("</head>",injected+"</head>").replace("</body>",boot+"</body>"),{status:asset.status,headers:new Headers(asset.headers)});
 }
 async function publicPrintable(db,slug){
  const p=await db.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug
