@@ -154,9 +154,11 @@ async function publicPrintable(db,slug){
     ORDER BY p.created_at DESC,p.id DESC LIMIT ?`).bind(...exclude,8-related.length).all();
   related.push(...(extra.results||[]));
  }
+ const categories=(await db.prepare("SELECT id,slug,name FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results||[];
  return {...p,
    files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)})),
-   related:related.slice(0,8).map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null}))
+   related:related.slice(0,8).map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null})),
+   categories
  };
 }
 
