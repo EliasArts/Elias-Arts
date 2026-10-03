@@ -154,7 +154,11 @@ async function publicPrintable(db,slug){
     ORDER BY p.created_at DESC,p.id DESC LIMIT ?`).bind(...exclude,8-related.length).all();
   related.push(...(extra.results||[]));
  }
- const categories=(await db.prepare("SELECT id,slug,name FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results||[];
+ const categories=(await db.prepare(`SELECT c.id,c.slug,c.name,c.description,c.banner_key,
+ COALESCE(c.banner_key,(SELECT COALESCE((SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id),
+ (SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY f.sort_order,f.id LIMIT 1))
+ FROM printables p WHERE p.category_id=c.id AND p.is_published=1 ORDER BY p.created_at DESC,p.id DESC LIMIT 1)) visual_key
+ FROM categories c WHERE c.is_visible=1 ORDER BY c.sort_order,c.id`).all()).results||[];
  return {...p,
    files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)})),
    related:related.slice(0,8).map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null})),
@@ -327,7 +331,11 @@ export default {async fetch(request,env){
    }
    return ok([...map.values()],200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   }
-  if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE is_visible=1 ORDER BY sort_order,id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
+  if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT c.id,c.slug,c.name,c.description,c.banner_key,c.sort_order,
+ COALESCE(c.banner_key,(SELECT COALESCE((SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id),
+   (SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY f.sort_order,f.id LIMIT 1))
+  FROM printables p WHERE p.category_id=c.id AND p.is_published=1 ORDER BY p.created_at DESC,p.id DESC LIMIT 1)) visual_key
+ FROM categories c WHERE c.is_visible=1 ORDER BY c.sort_order,c.id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   if(url.pathname==="/api/topics")return ok((await env.DB.prepare("SELECT t.id,t.slug,t.name,t.description,t.category_id,c.slug category_slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.is_visible=1 AND c.is_visible=1 ORDER BY c.sort_order,t.sort_order,t.id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   if(url.pathname==="/api/popular"){
    const r=await env.DB.prepare(`SELECT p.id,p.slug,p.title,p.description,p.download_count,p.is_featured,c.name category_name,t.name topic_name,
@@ -396,10 +404,8 @@ export default {async fetch(request,env){
     env.DB.prepare("INSERT INTO download_daily(printable_id,day,downloads) VALUES(?,?,1) ON CONFLICT(printable_id,day) DO UPDATE SET downloads=downloads+1").bind(p.id,day)
    ]);
    const filename=String(pdf.original_name||p.title+".pdf").replace(/["\\]/g,"-");
-   const target=new URL(fileUrl(pdf.storage_key),url);
-   target.searchParams.set("download","1");
-   target.searchParams.set("filename",filename);
-   return Response.redirect(target.toString(),302);
+   const headers=new Headers();obj.writeHttpMetadata(headers);headers.set("Content-Type","application/pdf");headers.set("Content-Disposition",`attachment; filename="${filename}"`);headers.set("Cache-Control","private, no-store");
+   return new Response(obj.body,{status:200,headers});
   }
   if(url.pathname.startsWith("/api/printables/")){
    const slug=decodeURIComponent(url.pathname.slice("/api/printables/".length));const p=await publicPrintable(env.DB,slug);return p?ok(p,200,{"Cache-Control":"public, max-age=60, stale-while-revalidate=300"}):bad("Printable not found.",404);
