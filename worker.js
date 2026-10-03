@@ -161,7 +161,7 @@ export default {async fetch(request,env){
   if(routeMatch=url.pathname.match(/^\/category\/([^/]+)$/)) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
   if(routeMatch=url.pathname==="/category" && url.searchParams.get("slug")) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(url.searchParams.get("slug")),url).toString(),302);
 
-  if((url.pathname==="/printable.html"||url.pathname==="/category.html")&&request.method==="GET"){
+  if((url.pathname==="/printable.html"||url.pathname==="/printable"||url.pathname==="/category.html"||url.pathname==="/category")&&request.method==="GET"){
    const slug=String(url.searchParams.get("slug")||"");
    if(slug){
     await init(env.DB);
