@@ -157,7 +157,9 @@ export default {async fetch(request,env){
 
   let routeMatch;
   if(routeMatch=url.pathname.match(/^\/printable\/([^/]+)$/)) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
+  if(routeMatch=url.pathname==="/printable" && url.searchParams.get("slug")) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(url.searchParams.get("slug")),url).toString(),302);
   if(routeMatch=url.pathname.match(/^\/category\/([^/]+)$/)) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
+  if(routeMatch=url.pathname==="/category" && url.searchParams.get("slug")) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(url.searchParams.get("slug")),url).toString(),302);
 
   if((url.pathname==="/printable.html"||url.pathname==="/category.html")&&request.method==="GET"){
    const slug=String(url.searchParams.get("slug")||"");
