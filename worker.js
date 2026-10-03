@@ -139,7 +139,7 @@ async function publicPrintable(db,slug){
  if(!p)return null;
  const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY CASE WHEN file_type='cover' THEN 0 ELSE 1 END,page_number,sort_order,id").bind(p.id).all();
  const rel=await db.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
-   (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
+   COALESCE((SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id),(SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY CASE WHEN f.file_type='page' THEN 0 ELSE 1 END,f.page_number,f.sort_order,f.id LIMIT 1)) cover_key
    FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
    WHERE p.is_published=1 AND p.id<>? AND (p.topic_id=? OR p.category_id=?)
    ORDER BY CASE WHEN p.topic_id=? THEN 0 ELSE 1 END,p.created_at DESC,p.id DESC LIMIT 12`).bind(p.id,p.topic_id,p.category_id,p.topic_id).all();
