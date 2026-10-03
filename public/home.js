@@ -1,9 +1,10 @@
 const esc=s=>String(s??'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
 async function loadHome(){
- const cg=document.getElementById('categoryGrid'),lg=document.getElementById('latestGrid');
+ const cg=document.getElementById('categoryGrid'),lg=document.getElementById('latestGrid'),pg=document.getElementById('popularGrid');
  if(cg)cg.innerHTML='<div class="small">Loading collections…</div>';
  if(lg)lg.innerHTML='<div class="small">Loading printables…</div>';
- const [cr,pr]=await Promise.allSettled([fetch('/api/categories'),fetch('/api/printables')]);
+ if(pg)pg.innerHTML='<div class="small">Loading most-downloaded printables…</div>';
+ const [cr,pr,rr]=await Promise.allSettled([fetch('/api/categories'),fetch('/api/printables'),fetch('/api/popular')]);
  if(cr.status==='fulfilled'&&cr.value.ok){
   try{
    const cats=await cr.value.json();
@@ -16,6 +17,12 @@ async function loadHome(){
    if(lg)lg.innerHTML=prints.slice(0,6).map(p=>'<a href="/printable.html?slug='+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img loading="lazy" src="'+p.cover_url+'" alt="'+esc(p.title)+'" style="width:100%;height:100%;object-fit:contain">':'<span class="small">Preview</span>')+'</div><div class="card-title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||p.category_name||'Printable')+' · Free</div></a>').join('')||'<div class="small">New printables are coming soon.</div>';
   }catch{if(lg)lg.innerHTML='<div class="small">Printables are temporarily unavailable. Please refresh.</div>'}
  }else if(lg)lg.innerHTML='<div class="small">Printables are temporarily unavailable. Please refresh.</div>';
+ if(rr.status==='fulfilled'&&rr.value.ok){
+  try{
+   const prints=await rr.value.json();
+   if(pg)pg.innerHTML=prints.slice(0,6).map((p,i)=>'<a href="/printable.html?slug='+encodeURIComponent(p.slug)+'"><div class="card-img">'+(p.cover_url?'<img loading="lazy" src="'+p.cover_url+'" alt="'+esc(p.title)+'" style="width:100%;height:100%;object-fit:contain">':'<span class="small">Preview</span>')+'</div><div class="card-title">'+esc(p.title)+'</div><div class="meta">'+esc(p.topic_name||p.category_name||'Printable')+' · '+(Number(p.download_count)||0)+' downloads</div>'+(Number(p.download_count)>0?'<div class="popular-badge">Most downloaded</div>':'')+'</a>').join('')||'<div class="small">Popular printables will appear here as downloads grow.</div>';
+  }catch{if(pg)pg.innerHTML='<div class="small">Most-downloaded printables are temporarily unavailable. Please refresh.</div>'}
+ }else if(pg)pg.innerHTML='<div class="small">Most-downloaded printables are temporarily unavailable. Please refresh.</div>';
 }
 loadHome();
 const sf=document.getElementById('subscribeForm');
