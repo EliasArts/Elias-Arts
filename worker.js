@@ -159,10 +159,12 @@ async function publicPrintable(db,slug){
  (SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY f.sort_order,f.id LIMIT 1))
  FROM printables p WHERE p.category_id=c.id AND p.is_published=1 ORDER BY p.created_at DESC,p.id DESC LIMIT 1)) visual_key
  FROM categories c WHERE c.is_visible=1 ORDER BY c.sort_order,c.id`).all()).results||[];
+ const donationSetting=await db.prepare("SELECT value FROM site_settings WHERE key='donation_url' LIMIT 1").first();
  return {...p,
    files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)})),
    related:related.slice(0,8).map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null})),
-   categories
+   categories,
+   donation_url:String(donationSetting?.value||"").trim()
  };
 }
 
