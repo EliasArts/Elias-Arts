@@ -8,7 +8,7 @@ async function loadHome(){
  if(cr.status==='fulfilled'&&cr.value.ok){
   try{
    const cats=await cr.value.json();
-   if(cg)cg.innerHTML=cats.map(c=>'<a class="cat" href="/category.html?slug='+encodeURIComponent(c.slug)+'"><div class="cat-banner">'+(c.banner_key?'<img loading="lazy" src="/files/'+encodeURIComponent(c.banner_key).replace(/%2F/g,'/')+'" alt="'+esc(c.name)+' category banner" style="width:100%;height:100%;object-fit:cover;border-radius:13px">':'<span>Explore collection</span>')+'</div><div class="cat-name">'+esc(c.name)+'</div><div class="cat-topics">'+esc(c.description||'Printable collection')+'</div></a>').join('');
+   if(cg)cg.innerHTML=cats.map(c=>'<a class="cat" href="/category.html?slug='+encodeURIComponent(c.slug)+'"><div class="cat-banner">'+(c.banner_url?'<img loading="lazy" src="'+esc(c.banner_url)+'" alt="'+esc(c.name)+' category banner" style="width:100%;height:100%;object-fit:cover;border-radius:13px">':'<span>Explore collection</span>')+'</div><div class="cat-name">'+esc(c.name)+'</div><div class="cat-topics">'+esc(c.description||'Printable collection')+'</div></a>').join('');
   }catch{if(cg)cg.innerHTML='<div class="small">Collections are temporarily unavailable. Please refresh.</div>'}
  }else if(cg)cg.innerHTML='<div class="small">Collections are temporarily unavailable. Please refresh.</div>';
  if(pr.status==='fulfilled'&&pr.value.ok){
