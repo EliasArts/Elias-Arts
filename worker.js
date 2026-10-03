@@ -151,7 +151,7 @@ async function publicPrintable(db,slug){
 export default {async fetch(request,env){
  try{
   const url=new URL(request.url);
-  const trackedPages=new Set(["/","/search","/category.html","/printable.html","/info.html"]);
+  const trackedPages=new Set(["/","/search","/category","/category.html","/printable","/printable.html","/info.html"]);
   if(request.method==="GET"&&trackedPages.has(url.pathname)){
     try{env.ANALYTICS_ENGINE?.writeDataPoint({indexes:["pageview"],blobs:["pageview",url.pathname],doubles:[1]});}catch{}
   }
