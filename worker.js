@@ -331,11 +331,14 @@ export default {async fetch(request,env){
    }
    return ok([...map.values()],200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   }
-  if(url.pathname==="/api/categories")return ok((await env.DB.prepare("SELECT c.id,c.slug,c.name,c.description,c.banner_key,c.sort_order,
- COALESCE(c.banner_key,(SELECT COALESCE((SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id),
-   (SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY f.sort_order,f.id LIMIT 1))
-  FROM printables p WHERE p.category_id=c.id AND p.is_published=1 ORDER BY p.created_at DESC,p.id DESC LIMIT 1)) visual_key
- FROM categories c WHERE c.is_visible=1 ORDER BY c.sort_order,c.id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
+  if(url.pathname==="/api/categories"){
+   const categories=(await env.DB.prepare(`SELECT c.id,c.slug,c.name,c.description,c.banner_key,c.sort_order,
+    COALESCE(c.banner_key,(SELECT COALESCE((SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id),
+      (SELECT storage_key FROM printable_files f WHERE f.printable_id=p.id AND f.file_type IN ('preview','page') ORDER BY f.sort_order,f.id LIMIT 1))
+     FROM printables p WHERE p.category_id=c.id AND p.is_published=1 ORDER BY p.created_at DESC,p.id DESC LIMIT 1)) visual_key
+    FROM categories c WHERE c.is_visible=1 ORDER BY c.sort_order,c.id`).all()).results||[];
+   return ok(categories.map(c=>({...c,banner_url:c.visual_key?fileUrl(c.visual_key):null})),200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
+  }
   if(url.pathname==="/api/topics")return ok((await env.DB.prepare("SELECT t.id,t.slug,t.name,t.description,t.category_id,c.slug category_slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.is_visible=1 AND c.is_visible=1 ORDER BY c.sort_order,t.sort_order,t.id").all()).results,200,{"Cache-Control":"public, max-age=300, stale-while-revalidate=600"});
   if(url.pathname==="/api/popular"){
    const r=await env.DB.prepare(`SELECT p.id,p.slug,p.title,p.description,p.download_count,p.is_featured,c.name category_name,t.name topic_name,
