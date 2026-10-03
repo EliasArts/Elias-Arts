@@ -387,10 +387,10 @@ export default {async fetch(request,env){
   }
   if(url.pathname==="/sitemap.xml"&&request.method==="GET"){
     const base="https://elias-arts.eliasoscararts.workers.dev";
-    const urls=[base+"/",base+"/category.html?slug=coloring-creative",base+"/category.html?slug=planning-organization",base+"/category.html?slug=letter-journaling",base+"/category.html?slug=decorative",base+"/category.html?slug=gifts-occasions",base+"/info.html?page=about",base+"/info.html?page=contact",base+"/info.html?page=privacy",base+"/info.html?page=terms"];
+    const urls=[base+"/",base+"/about",base+"/contact",base+"/privacy",base+"/terms"];
     const cats=(await env.DB.prepare("SELECT slug FROM categories WHERE is_visible=1 ORDER BY sort_order").all()).results;
     const prints=(await env.DB.prepare("SELECT slug FROM printables WHERE is_published=1 ORDER BY created_at DESC").all()).results;
-    const all=[...urls,...cats.map(c=>base+"/category.html?slug="+encodeURIComponent(c.slug)),...prints.map(p=>base+"/printable.html?slug="+encodeURIComponent(p.slug))];
+    const all=[...urls,...cats.map(c=>base+"/category/"+encodeURIComponent(c.slug)),...prints.map(p=>base+"/printable/"+encodeURIComponent(p.slug))];
     const uniq=[...new Set(all)];
     return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+uniq.map(u=>"<url><loc>"+u.replaceAll("&","&amp;")+"</loc></url>").join("")+"</urlset>",{headers:{"Content-Type":"application/xml; charset=UTF-8","Cache-Control":"public, max-age=3600"}});
   }
