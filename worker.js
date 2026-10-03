@@ -137,14 +137,26 @@ async function publicPrintable(db,slug){
  FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
  WHERE p.slug=? AND p.is_published=1`).bind(slug).first();
  if(!p)return null;
- const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY sort_order,id").bind(p.id).all();
+ const f=await db.prepare("SELECT id,file_type,storage_key,original_name,page_number,sort_order,is_downloadable FROM printable_files WHERE printable_id=? ORDER BY CASE WHEN file_type='cover' THEN 0 ELSE 1 END,page_number,sort_order,id").bind(p.id).all();
  const rel=await db.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
    (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
    FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
-   WHERE p.is_published=1 AND p.id<>? AND (p.category_id=? OR p.topic_id=?) ORDER BY p.created_at DESC LIMIT 6`).bind(p.id,p.category_id,p.topic_id).all();
+   WHERE p.is_published=1 AND p.id<>? AND (p.topic_id=? OR p.category_id=?)
+   ORDER BY CASE WHEN p.topic_id=? THEN 0 ELSE 1 END,p.created_at DESC,p.id DESC LIMIT 12`).bind(p.id,p.topic_id,p.category_id,p.topic_id).all();
+ const related=rel.results||[];
+ if(related.length<8){
+  const exclude=[p.id,...related.map(x=>x.id)];
+  const placeholders=exclude.map(()=>"?").join(",");
+  const extra=await db.prepare(`SELECT p.id,p.slug,p.title,p.description,c.name category_name,t.name topic_name,
+    (SELECT storage_key FROM printable_files f WHERE f.id=p.cover_file_id) cover_key
+    FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
+    WHERE p.is_published=1 AND p.id NOT IN (${placeholders})
+    ORDER BY p.created_at DESC,p.id DESC LIMIT ?`).bind(...exclude,8-related.length).all();
+  related.push(...(extra.results||[]));
+ }
  return {...p,
    files:f.results.map(x=>({...x,url:fileUrl(x.storage_key)})),
-   related:rel.results.map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null}))
+   related:related.slice(0,8).map(x=>({...x,cover_url:x.cover_key?fileUrl(x.cover_key):null}))
  };
 }
 
