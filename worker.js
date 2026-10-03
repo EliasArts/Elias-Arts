@@ -157,6 +157,7 @@ export default {async fetch(request,env){
   }
 
   let routeMatch;
+  if(routeMatch=url.pathname.match(/^\/(about|contact|privacy|terms)$/)){const info=routeMatch[1];return Response.redirect(new URL("/info.html?page="+info,url).toString(),301);}
   if(routeMatch=url.pathname.match(/^\/printable\/([^/]+)$/)) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
   if(routeMatch=url.pathname==="/printable" && url.searchParams.get("slug")) return Response.redirect(new URL("/printable.html?slug="+encodeURIComponent(url.searchParams.get("slug")),url).toString(),302);
   if(routeMatch=url.pathname.match(/^\/category\/([^/]+)$/)) return Response.redirect(new URL("/category.html?slug="+encodeURIComponent(decodeURIComponent(routeMatch[1])),url).toString(),302);
