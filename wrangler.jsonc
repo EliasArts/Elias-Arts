@@ -9,7 +9,7 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
-  "analytics": { "binding": "ANALYTICS_SQL", "remote": true },
+  "analytics": { "binding": "ANALYTICS_SQL" },
   "analytics_engine_datasets": [
     { "binding": "ANALYTICS_ENGINE", "dataset": "elias_arts_analytics" }
   ],
