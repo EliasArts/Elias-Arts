@@ -39,7 +39,7 @@ async function load(){
   }
   const imageCount=allImages.length;
   const slideLabel=(f,i)=>f?.page_number!=null?'Page '+f.page_number:(i===0&&f?.file_type==='cover'?'Cover':'Preview '+(i+1));
-  const relatedSection=p.related?.length?'<section class="related" aria-labelledby="relatedHeading"><div class="related-head"><div class="related-title-wrap"><h2 id="relatedHeading">You would like more?</h2><p>Explore more printables similar to this one and keep creating.</p></div><a class="related-all" href="/search">View all printables →</a></div><div class="related-cards">'+p.related.slice(0,8).map(x=>relatedCard(x).replace('<a ','<a class="related-card" ')).join('')+'</div></section>':'';
+  const relatedSection=p.related?.length?'<section class="related" aria-labelledby="relatedHeading"><div class="related-head"><div class="related-title-wrap"><div class="eyebrow">Recommended for you</div><h2 id="relatedHeading">More like it</h2><p>Discover more printables in the same style or collection.</p></div><a class="related-all" href="/search">View all printables →</a></div><div class="related-cards">'+p.related.slice(0,8).map(x=>relatedCard(x).replace('<a ','<a class="related-card" ')).join('')+'</div></section>':'';
   const categoryNav='<section class="category-browser" aria-labelledby="categoryBrowserHeading"><div class="category-browser-head"><div><div class="eyebrow">Explore the library</div><h2 id="categoryBrowserHeading">Browse by category</h2><p>Find another collection and keep exploring Elias Arts.</p></div></div><div class="category-pills">'+
   (p.categories||[]).map(c=>'<a class="category-pill" href="/category.html?slug='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'<span>→</span></a>').join('')+
   '</div></section>';
