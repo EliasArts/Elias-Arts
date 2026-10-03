@@ -165,7 +165,7 @@ export default {async fetch(request,env){
    const slug=String(url.searchParams.get("slug")||"");
    if(slug){
     await init(env.DB);
-    if(url.pathname==="/printable.html"){
+    if(url.pathname==="/printable.html"||url.pathname==="/printable"){
      const p=await publicPrintable(env.DB,slug);if(p)return servePreloadedPage(env,request,"/printable.html",p);return bad("Printable not found.",404);
     }
     const cat=await env.DB.prepare("SELECT id,slug,name,description,banner_key,sort_order FROM categories WHERE slug=? AND is_visible=1").bind(slug).first();
