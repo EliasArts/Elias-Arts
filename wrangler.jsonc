@@ -7,7 +7,8 @@
     "directory": "./public",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*", "/files/*"]
   },
   "analytics": { "binding": "ANALYTICS_SQL" },
   "analytics_engine_datasets": [
