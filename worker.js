@@ -337,7 +337,7 @@ export default {async fetch(request,env){
     FROM printables p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN topics t ON t.id=p.topic_id
     WHERE p.is_published=1
     ORDER BY COALESCE(p.download_count,0) DESC,p.is_featured DESC,p.created_at DESC,p.id DESC LIMIT 12`).all();
-   return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})),200,{"Cache-Control":"public, max-age":60, stale-while-revalidate":300});
+   return ok(r.results.map(p=>({...p,cover_url:p.cover_key?fileUrl(p.cover_key):null})),200,{"Cache-Control":"public, max-age=60, stale-while-revalidate=300"});
   }
   if(url.pathname==="/api/printables"){
    const r=await env.DB.prepare(`SELECT p.*,c.name category_name,c.slug category_slug,t.name topic_name,t.slug topic_slug,
